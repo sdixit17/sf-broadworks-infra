@@ -41,7 +41,12 @@ dig bridge.telqon.com +short                         # prints the IP
 python test-server/aws_test_server.py status               # DNS ✓ and HTTPS OK
 ```
 
-HTTPS starts by itself a few minutes after the record works.
+HTTPS starts by itself a few minutes after the record works. To test before DNS has spread, add an instant
+address too (sslip.io names resolve to the IP in them):
+
+```
+python test-server/aws_test_server.py up --domain bridge.telqon.com,51-24-196-195.sslip.io
+```
 
 ## 3. Set up the bridge
 

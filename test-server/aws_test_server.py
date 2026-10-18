@@ -49,6 +49,11 @@ def step(msg):
     print(f"• {msg}", flush=True)
 
 
+def domains(value):
+    """--domain "a,b" -> ["a", "b"]; the first is the main address."""
+    return [d.strip() for d in value.split(",") if d.strip()]
+
+
 class Server:
     def __init__(self, a):
         self.a = a
@@ -170,8 +175,8 @@ if [ ! -f /swapfile ]; then fallocate -l 2G /swapfile; chmod 600 /swapfile; mksw
   echo '/swapfile swap swap defaults 0 0' >> /etc/fstab; fi
 mkdir -p /opt/bridge
 cat > /opt/bridge/bridge.env <<'ENV'
-BRIDGE_DOMAIN={self.a.domain}
-BRIDGE_PUBLIC_URL=https://{self.a.domain}
+BRIDGE_DOMAIN="{", ".join(domains(self.a.domain))}"
+BRIDGE_PUBLIC_URL=https://{domains(self.a.domain)[0]}
 BRIDGE_SETUP_CODE={setup_code}
 AWS_DEFAULT_REGION={self.a.region}
 ENV
@@ -262,7 +267,13 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
                 self.ec2.get_waiter("instance_running").wait(InstanceIds=[iid])
             ip = self.ip_setup(iid)
             step(f"updating server {iid}")
-            status, out = self.run(iid, [f"bash /opt/bridge/current/deploy/server-deploy.sh {bundle} {self.a.region} 2>&1 | tail -40"])
+            # run the deploy script from the new bundle, so changes to it apply on this very update
+            status, out = self.run(iid, [
+                "set -e; rm -rf /tmp/nd; mkdir -p /tmp/nd",
+                f"aws s3 cp --region {self.a.region} --only-show-errors {bundle} /tmp/nd/b.tar.gz",
+                "tar -xzf /tmp/nd/b.tar.gz -C /tmp/nd deploy/server-deploy.sh",
+                f"bash /tmp/nd/deploy/server-deploy.sh {bundle} {self.a.region} '{','.join(domains(self.a.domain))}' "
+                "2>&1 | tail -40"])
         print()
         print(out.strip())
         if status != "Success":
@@ -270,20 +281,27 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
         self.report(iid, ip, setup_code)
 
     def report(self, iid, ip, setup_code=None):
-        d = self.a.domain
-        try:
-            resolved = socket.gethostbyname(d)
-        except OSError:
-            resolved = None
         print(f"\nServer {iid}   IP {ip}   region {self.a.region}")
-        if resolved != ip:
-            print(f"""
-DNS: {d} {'points at ' + resolved if resolved else 'does not resolve yet'}. In Wix: Domains > telqon.com > ⋯ >
-Manage DNS records > A (Host) > Add record:  host "{d.split('.')[0]}",  value {ip}.  HTTPS starts by itself
-a few minutes after the record works (check with: python test-server/aws_test_server.py status).""")
-        else:
-            print(f"DNS: {d} -> {ip} ✓")
-            print(f"HTTPS: {self.https_check(d)}")
+        live = None
+        for d in domains(self.a.domain):
+            try:
+                resolved = socket.gethostbyname(d)
+            except OSError:
+                resolved = None
+            if resolved != ip:
+                print(f"DNS: {d} {'points at ' + resolved if resolved else 'does not resolve yet'}")
+                if not d.endswith("sslip.io"):
+                    print(f"     In Wix: Domains > {d.split('.', 1)[1]} > ⋯ > Manage DNS records > A (Host) > Add record: "
+                          f"host \"{d.split('.')[0]}\", value {ip}, then Save.")
+                continue
+            https = self.https_check(d)
+            print(f"DNS: {d} -> {ip} ✓   HTTPS: {https}")
+            if https.startswith("OK") and not live:
+                live = d
+        if not any(d.endswith("sslip.io") for d in domains(self.a.domain)):
+            print(f"     To test before DNS works: python test-server/aws_test_server.py up "
+                  f"--domain {domains(self.a.domain)[0]},{ip.replace('.', '-')}.sslip.io")
+        d = live or domains(self.a.domain)[0]
         print(f"\nSettings page: https://{d}/admin.html")
         if setup_code:
             print(f"Setup code:    {setup_code}   (only until administrators are set; later: "

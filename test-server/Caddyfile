@@ -1,4 +1,5 @@
-# HTTPS for the bridge. Certificates come from Let's Encrypt once $BRIDGE_DOMAIN points at this server.
+# HTTPS for the bridge. Certificates come from Let's Encrypt once each address in $BRIDGE_DOMAIN (comma-separated)
+# points at this server.
 {$BRIDGE_DOMAIN} {
 	reverse_proxy bridge:8080 {
 		# /api/events and /api/supervisor/events are Server-Sent Events: pass them on unbuffered
