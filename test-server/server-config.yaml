@@ -1,0 +1,14 @@
+# Starting settings on the test server (written once to /opt/bridge/data/config.yaml). Everything else is set
+# on the Settings page (https://__DOMAIN__/admin.html) and kept in /opt/bridge/data/settings.json.
+bridge:
+  listen_host: 0.0.0.0
+  listen_port: 8080                   # Caddy terminates HTTPS in front of it
+  connector_dir: /app/connector/dist
+  cors_origins: ["https://127.0.0.1:8080"]   # the local connector page (tools/connector_shim.py)
+log_file: /data/logs/bridge.log
+analytics:
+  db_file: /data/analytics.sqlite
+media:
+  recordings:
+    local_dir: /data/recordings
+    public_url: "https://__DOMAIN__"

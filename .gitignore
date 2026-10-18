@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+*.pem
+*.key
+.terraform/
+*.tfstate*

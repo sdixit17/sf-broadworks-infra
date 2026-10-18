@@ -1,0 +1,40 @@
+# Test server: the bridge behind Caddy (automatic HTTPS from Let's Encrypt for $BRIDGE_DOMAIN).
+# Run by server-deploy.sh (bundled as deploy/ next to the app) with /opt/bridge/bridge.env loaded.
+name: bridge
+services:
+  bridge:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: telqon-bridge:latest
+    container_name: bridge
+    restart: unless-stopped
+    env_file: /opt/bridge/bridge.env
+    volumes:
+      - /opt/bridge/data:/data
+    expose:
+      - "8080"
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+  caddy:
+    image: caddy:2.8
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - BRIDGE_DOMAIN=${BRIDGE_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - bridge
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+volumes:
+  caddy_data: {}
+  caddy_config: {}

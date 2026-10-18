@@ -1,0 +1,9 @@
+# HTTPS for the bridge. Certificates come from Let's Encrypt once $BRIDGE_DOMAIN points at this server.
+{$BRIDGE_DOMAIN} {
+	reverse_proxy bridge:8080 {
+		# /api/events and /api/supervisor/events are Server-Sent Events: pass them on unbuffered
+		flush_interval -1
+	}
+	header Strict-Transport-Security "max-age=31536000"
+	header -Server
+}
