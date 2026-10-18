@@ -26,7 +26,8 @@ instead deploy images the app repo's CI pushes to ECR.
   UK account) or the self-hosted SIPREC route (jambonz + Transcribe/Deepgram).
 - The account is in Telqon's AWS Organization (management 943939514727, info@telqon.com) with SCP
   `AdvancedModeRegionRestrictionSecurityControlPolicy`; eu-west-2 was added to its RegionFloor list.
-- DNS for telqon.com is at **Wix** (ns2/ns3.wixdns.net): A record `bridge` → the test server's Elastic IP.
+- DNS for telqon.com is at **Wix** (ns2/ns3.wixdns.net): A record `bridge` → the test server's Elastic IP
+  **51.24.196.195** (server created 18 Oct; record added in Wix the same day, propagation pending).
 - Salesforce's quick-start provider loads the connector from https://127.0.0.1:8080, so agents run the app's
   `tools/connector_shim.py --bridge https://bridge.telqon.com` until Telqon's own provider package exists.
 - Validated against botocore models and (test server) a local Docker build/run; not yet run against real AWS.
