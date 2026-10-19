@@ -6,9 +6,10 @@ repository only describes and drives where and how it runs.
 
 | Path | What |
 |---|---|
-| `test-server/` | Test server for `bridge.telqon.com`: one EC2 server in London with Docker + Caddy (automatic HTTPS), managed with Session Manager. `aws_test_server.py up / status / logs / setup-code / delete`. See [test-server/README.md](test-server/README.md). |
+| `front-door/` | **bridge.telqon.com** for every customer: the phone page + customer directory on S3 + CloudFront (nothing to go down). `front_door.py up / deploy / add / remove / list / status`. See [front-door/README.md](front-door/README.md). |
+| `test-server/` | A bridge on one EC2 server in London with Docker + Caddy (automatic HTTPS), managed with Session Manager: `test.bridge.telqon.com`, or a customer's with `--name/--domain`. `aws_test_server.py up / status / logs / restart / stop / start / setup-code / delete`. See [test-server/README.md](test-server/README.md). |
 | `media-pipeline/` | Call recording and real-time transcription: BroadWorks Call Recording → Chime SDK Voice Connector → Transcribe Call Analytics + S3 → forwarder Lambda → bridge. `setup_media.py`. See [media-pipeline/README.md](media-pipeline/README.md). |
-| `tests/` | `test_forwarder.py`: the forwarder against sample AWS events (no AWS needed). |
+| `tests/` | `test_forwarder.py` (forwarder on sample events), `test_front_door.py` (front_door.py on simulated AWS, requests checked against botocore models). No AWS needed. |
 
 Planned: `terraform/` for production (ECS Fargate, RDS Postgres, Redis, ALB/WAF, staging + production) and
 CI/CD that deploys images the app repository builds.
@@ -26,3 +27,4 @@ credentials (`aws configure`; `aws sts get-caller-identity` to check).
 ## Test
 
     python tests/test_forwarder.py
+    python tests/test_front_door.py

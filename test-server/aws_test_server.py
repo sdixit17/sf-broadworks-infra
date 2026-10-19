@@ -181,6 +181,7 @@ cat > /opt/bridge/bridge.env <<'ENV'
 BRIDGE_DOMAIN="{", ".join(domains(self.a.domain))}"
 BRIDGE_PUBLIC_URL=https://{domains(self.a.domain)[0]}
 BRIDGE_SETUP_CODE={setup_code}
+BRIDGE_FRONT_DOOR={self.a.front_door}
 AWS_DEFAULT_REGION={self.a.region}
 ENV
 chmod 600 /opt/bridge/bridge.env
@@ -276,6 +277,7 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
                 f"aws s3 cp --region {self.a.region} --only-show-errors {bundle} /tmp/nd/b.tar.gz",
                 "tar -xzf /tmp/nd/b.tar.gz -C /tmp/nd deploy/server-deploy.sh",
                 f"bash /tmp/nd/deploy/server-deploy.sh {bundle} {self.a.region} '{','.join(domains(self.a.domain))}' "
+                f"'{self.a.front_door}' "
                 "2>&1 | tail -40"])
         print()
         print(out.strip())
@@ -294,8 +296,9 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
             if resolved != ip:
                 print(f"DNS: {d} {'points at ' + resolved if resolved else 'does not resolve yet'}")
                 if not d.endswith("sslip.io"):
-                    print(f"     In Wix: Domains > {d.split('.', 1)[1]} > ⋯ > Manage DNS records > A (Host) > Add record: "
-                          f"host \"{d.split('.')[0]}\", value {ip}, then Save.")
+                    zone = ".".join(d.split(".")[-2:])
+                    print(f"     In Wix: Domains > {zone} > ⋯ > Manage DNS records > A (Host) > Add record: "
+                          f"host \"{d[:-len(zone) - 1]}\", value {ip}, then Save.")
                 continue
             https = self.https_check(d)
             print(f"DNS: {d} -> {ip} ✓   HTTPS: {https}")
@@ -327,7 +330,7 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
     def status(self):
         inst = self.instance()
         if not inst:
-            return print("No test server. Create it with: python test-server/aws_test_server.py up --domain bridge.telqon.com")
+            return print("No test server. Create it with: python test-server/aws_test_server.py up --domain test.bridge.telqon.com")
         addr = self.eip()
         print(f"Server {inst['InstanceId']}: {inst['State']['Name']}, {inst['InstanceType']}")
         self.report(inst["InstanceId"], addr["PublicIp"] if addr else inst.get("PublicIpAddress"))
@@ -432,7 +435,10 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", choices=["up", "status", "logs", "setup-code", "restart", "stop", "start", "delete"])
-    ap.add_argument("--domain", default="bridge.telqon.com")
+    ap.add_argument("--domain", default="test.bridge.telqon.com",
+                    help="this bridge's address(es), comma-separated; bridge.telqon.com itself is the front door")
+    ap.add_argument("--front-door", default="https://bridge.telqon.com",
+                    help="where Salesforce loads the phone (front-door/front_door.py); the bridge accepts it")
     ap.add_argument("--app-dir", default=str(INFRA.parent / "sf-broadworks-bridge"),
                     help="checkout of sdixit17/sf-broadworks-bridge (default: next to this repository)")
     ap.add_argument("--region", default="eu-west-2")
