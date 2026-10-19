@@ -338,7 +338,8 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
         status, out = self.run(inst, ["grep BRIDGE_SETUP_CODE /opt/bridge/bridge.env | cut -d= -f2"], quiet=True)
         print(f"Setup code: {out.strip()}   (works only while no Settings administrators or enterprise are set)")
 
-    COMPOSE = "cd /opt/bridge/current/deploy && docker compose"
+    # bridge.env must be loaded: Caddy takes BRIDGE_DOMAIN from it (without it Caddy serves no site)
+    COMPOSE = "cd /opt/bridge/current/deploy && set -a && . /opt/bridge/bridge.env && set +a && docker compose"
 
     def restart(self):
         inst = self.need()

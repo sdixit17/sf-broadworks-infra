@@ -24,8 +24,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
-    environment:
-      - BRIDGE_DOMAIN=${BRIDGE_DOMAIN}
+    env_file: /opt/bridge/bridge.env        # BRIDGE_DOMAIN for the Caddyfile, whoever runs docker compose
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
