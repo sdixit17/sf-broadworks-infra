@@ -54,6 +54,13 @@ def hint(e):
         return (f"{s}\n\nTelqon's AWS Organization blocks this region or service (SCP "
                 "AdvancedModeRegionRestrictionSecurityControlPolicy). CloudFront certificates must live in us-east-1: "
                 "allow acm:* in us-east-1 (and cloudfront:*, a global service) in that policy, then run this again.")
+    if "must be verified before you can add new CloudFront resources" in s:
+        return (f"{s}\n\nAWS blocks CloudFront on new accounts until AWS Support verifies them (free). Open a case:\n"
+                "  AWS console > Support > Create case > Account and billing > Service: Account, Category: Other\n"
+                "  Subject: Please verify account for CloudFront\n"
+                "  Text: paste the error above and add: 'We serve a small static web page (a Salesforce telephony\n"
+                "        phone page) for our customers on bridge.telqon.com; expected traffic is low.'\n"
+                "It usually takes 1-2 working days. Nothing has changed for your agents; run `up` again once AWS replies.")
     return s
 
 
