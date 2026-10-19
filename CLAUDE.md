@@ -8,7 +8,7 @@ Owner: Sandesh (GitHub `sdixit17`), Telqon/AVC.
 
 | Path | What |
 |---|---|
-| `test-server/aws_test_server.py` | boto3: EC2 t4g.small (AL2023 arm64, IMDSv2, 20 GB gp3 encrypted) in eu-west-2, Elastic IP, SG 80/443 only, IAM role (SSM core + read bundles), private S3 bundle bucket; `up` (create or deploy), `status`, `logs`, `setup-code`, `delete`; commands run via SSM `AWS-RunShellScript` |
+| `test-server/aws_test_server.py` | boto3: EC2 t4g.small (AL2023 arm64, IMDSv2, 20 GB gp3 encrypted) in eu-west-2, Elastic IP, SG 80/443 only, IAM role (SSM core + read bundles), private S3 bundle bucket; `up` (create or deploy), `status`, `logs`, `setup-code`, `restart`, `stop [--server]`, `start`, `delete`; commands run via SSM `AWS-RunShellScript` |
 | `test-server/server-deploy.sh` + `docker-compose.yml` + `Caddyfile` + `server-config.yaml` | On the server: bundle → `/opt/bridge/releases/<ts>`, `current` symlink, `/opt/bridge/data` (settings.json, secrets/, analytics.sqlite, logs) mounted at /data, `/opt/bridge/bridge.env` (BRIDGE_DOMAIN, BRIDGE_PUBLIC_URL, BRIDGE_SETUP_CODE) |
 | `media-pipeline/setup_media.py` + `forwarder/handler.py` | Voice Connector (no encryption), call analytics config (Transcribe Call Analytics en-GB + S3 WAV + Kinesis), forwarder Lambda → bridge `/api/media/*` matched by `numbers` |
 | `tests/test_forwarder.py` | forwarder checks on sample events |
@@ -27,10 +27,10 @@ instead deploy images the app repo's CI pushes to ECR.
 - The account is in Telqon's AWS Organization (management 943939514727, info@telqon.com) with SCP
   `AdvancedModeRegionRestrictionSecurityControlPolicy`; eu-west-2 was added to its RegionFloor list.
 - DNS for telqon.com is at **Wix** (ns2/ns3.wixdns.net): A record `bridge` → the test server's Elastic IP
-  **51.24.196.195** (server created 18 Oct; record added in Wix the same day, propagation pending).
+  **51.24.196.195** (server created 18 Oct; live).
 - Since 19 Oct Salesforce loads the connector straight from https://bridge.telqon.com/ (Telqon's provider package,
   contact center TelqonCC); the connector shim is no longer needed. Nothing runs on the owner's laptop.
-- Validated against botocore models and (test server) a local Docker build/run; not yet run against real AWS.
+- Test server running on real AWS since 18 Oct (eu-west-2). Media pipeline validated against botocore models only.
 
 ## Conventions
 

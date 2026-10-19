@@ -70,18 +70,11 @@ sf project deploy start --metadata-dir salesforce/setup/trusted-url --target-org
 adds `https://bridge.telqon.com` as a Trusted URL. In App Builder, set the **Supervisor** page's
 `supervisorConsole` component property **Bridge URL** to `https://bridge.telqon.com` and save.
 
-## 5. Each agent's computer (until Telqon's own provider package)
+## 5. Agents' computers
 
-Salesforce's quick-start provider loads the phone from `https://127.0.0.1:8080/`, so agents run the small
-connector page (no BroadWorks or Salesforce credentials in it):
-
-```
-# in sf-broadworks-bridge
-(cd connector && npm install && npm run build)
-python tools/connector_shim.py --bridge https://bridge.telqon.com --cert local_tls.pem --key local_tls.key
-```
-
-Stop the old local bridge first (same port).
+Nothing to install. Telqon's provider package (`telqon__BroadWorksBridge`, see the app's
+`salesforce/provider-package/`) makes Salesforce load the phone straight from https://bridge.telqon.com/.
+Use a contact center on that provider (TelqonCC). Only the old quick-start provider needed `tools/connector_shim.py`.
 
 ## Day to day
 
@@ -90,6 +83,10 @@ python test-server/aws_test_server.py up          # deploy the current code (set
 python test-server/aws_test_server.py logs        # recent bridge log
 python test-server/aws_test_server.py status
 python test-server/aws_test_server.py setup-code
+python test-server/aws_test_server.py restart     # restart the bridge
+python test-server/aws_test_server.py stop        # stop the bridge (server keeps running)
+python test-server/aws_test_server.py stop --server   # stop the whole server (saves EC2 cost; IP, disk, settings kept)
+python test-server/aws_test_server.py start       # start the server if stopped, then the bridge
 python test-server/aws_test_server.py delete      # remove everything (then delete the Wix record)
 ```
 

@@ -5,6 +5,9 @@
     python test-server/aws_test_server.py status             server, IP, DNS and HTTPS check
     python test-server/aws_test_server.py logs [--lines 300] the bridge's recent log
     python test-server/aws_test_server.py setup-code         the Settings page setup code
+    python test-server/aws_test_server.py restart            restart the bridge (settings and history kept)
+    python test-server/aws_test_server.py stop               stop the bridge, or with --server the whole server
+    python test-server/aws_test_server.py start              start the server (if stopped) and the bridge
     python test-server/aws_test_server.py delete             remove the server (keeps nothing)
 
 The app comes from a checkout of sdixit17/sf-broadworks-bridge: --app-dir (default ../sf-broadworks-bridge,
@@ -335,6 +338,48 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
         status, out = self.run(inst, ["grep BRIDGE_SETUP_CODE /opt/bridge/bridge.env | cut -d= -f2"], quiet=True)
         print(f"Setup code: {out.strip()}   (works only while no Settings administrators or enterprise are set)")
 
+    COMPOSE = "cd /opt/bridge/current/deploy && docker compose"
+
+    def restart(self):
+        inst = self.need()
+        step("restarting the bridge")
+        status, out = self.run(inst, [f"{self.COMPOSE} restart bridge && sleep 5 && {self.COMPOSE} ps"], quiet=True)
+        print(out)
+        self.status()
+
+    def stop(self):
+        inst = self.instance()
+        if not inst or inst["State"]["Name"] in ("stopping", "stopped"):
+            return print("The test server is already stopped.")
+        if not self.a.server:
+            step("stopping the bridge (the server keeps running; start it again with: start)")
+            status, out = self.run(inst["InstanceId"], [f"{self.COMPOSE} stop bridge && {self.COMPOSE} ps"], quiet=True)
+            return print(out)
+        self.ec2.stop_instances(InstanceIds=[inst["InstanceId"]])
+        step(f"server {inst['InstanceId']} stopping (disk, settings and IP are kept; start it again with: start)")
+        self.ec2.get_waiter("instance_stopped").wait(InstanceIds=[inst["InstanceId"]])
+        step("stopped")
+
+    def start(self):
+        inst = self.instance()
+        if not inst:
+            raise SystemExit("No test server. Create it with: python test-server/aws_test_server.py up")
+        iid = inst["InstanceId"]
+        if inst["State"]["Name"] != "running":
+            if inst["State"]["Name"] == "stopping":
+                self.ec2.get_waiter("instance_stopped").wait(InstanceIds=[iid])
+            self.ec2.start_instances(InstanceIds=[iid])
+            step(f"server {iid} starting")
+            self.ec2.get_waiter("instance_running").wait(InstanceIds=[iid])
+        step("starting the bridge")
+        status, out = self.run(iid, [f"{self.COMPOSE} up -d && sleep 5 && {self.COMPOSE} ps"], quiet=True)
+        print(out)
+        for _ in range(12):                                   # Caddy and the bridge need a few seconds
+            if self.https_check(domains(self.a.domain)[0]).startswith("OK"):
+                break
+            time.sleep(5)
+        self.status()
+
     def need(self):
         inst = self.instance()
         if not inst or inst["State"]["Name"] != "running":
@@ -381,7 +426,7 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=["up", "status", "logs", "setup-code", "delete"])
+    ap.add_argument("command", choices=["up", "status", "logs", "setup-code", "restart", "stop", "start", "delete"])
     ap.add_argument("--domain", default="bridge.telqon.com")
     ap.add_argument("--app-dir", default=str(INFRA.parent / "sf-broadworks-bridge"),
                     help="checkout of sdixit17/sf-broadworks-bridge (default: next to this repository)")
@@ -389,9 +434,11 @@ def main():
     ap.add_argument("--name", default="telqon-bridge-test")
     ap.add_argument("--instance-type", default="t4g.small")
     ap.add_argument("--lines", type=int, default=300)
+    ap.add_argument("--server", action="store_true", help="stop: stop the whole EC2 server, not just the bridge")
     a = ap.parse_args()
     s = Server(a)
-    {"up": s.up, "status": s.status, "logs": s.logs, "setup-code": s.setup_code, "delete": s.delete}[a.command]()
+    {"up": s.up, "status": s.status, "logs": s.logs, "setup-code": s.setup_code,
+     "restart": s.restart, "stop": s.stop, "start": s.start, "delete": s.delete}[a.command]()
 
 
 if __name__ == "__main__":
