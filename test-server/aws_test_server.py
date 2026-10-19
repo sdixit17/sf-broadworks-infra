@@ -301,7 +301,7 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
             print(f"DNS: {d} -> {ip} ✓   HTTPS: {https}")
             if https.startswith("OK") and not live:
                 live = d
-        if not any(d.endswith("sslip.io") for d in domains(self.a.domain)):
+        if not live and not any(d.endswith("sslip.io") for d in domains(self.a.domain)):
             print(f"     To test before DNS works: python test-server/aws_test_server.py up "
                   f"--domain {domains(self.a.domain)[0]},{ip.replace('.', '-')}.sslip.io")
         d = live or domains(self.a.domain)[0]
@@ -313,9 +313,13 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
 
     @staticmethod
     def https_check(domain):
+        import ssl
         import urllib.request
+        from botocore.httpsession import get_cert_path
+        # python.org's Python on macOS has no CA certificates of its own; use the bundle boto3 already ships
+        ctx = ssl.create_default_context(cafile=get_cert_path(True))
         try:
-            with urllib.request.urlopen(f"https://{domain}/healthz", timeout=10) as r:
+            with urllib.request.urlopen(f"https://{domain}/healthz", timeout=10, context=ctx) as r:
                 return f"OK {r.read(200).decode(errors='replace')}"
         except Exception as e:
             return f"not yet ({e})"
