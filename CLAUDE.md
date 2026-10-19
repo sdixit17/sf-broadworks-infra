@@ -27,6 +27,11 @@ instead deploy images the app repo's CI pushes to ECR.
   UK account) or the self-hosted SIPREC route (jambonz + Transcribe/Deepgram).
 - The account is in Telqon's AWS Organization (management 943939514727, info@telqon.com) with SCP
   `AdvancedModeRegionRestrictionSecurityControlPolicy`; eu-west-2 was added to its RegionFloor list.
+- CloudFront blocked (20 Oct): `CreateDistribution` -> AccessDenied "Your account must be verified before you can add new
+  CloudFront resources". Support case opened; first verification failed (name couldn't be verified: account contact
+  name vs ID/card, AISPL KYC). Owner chose to wait for AWS. Already created: front-door bucket, ACM cert for
+  bridge.telqon.com (ISSUED; its `_...` CNAME stays in Wix). Fallbacks discussed: AVC's UK account (also fixes Chime),
+  or Cloudflare/GitHub Pages for the static front door.
 - Front door (app v0.12.0, 19 Oct): code ready, offline-tested only; the owner still has to run the switch-over in
   `front-door/README.md` (test server -> test.bridge.telqon.com, ACM DNS record + CNAME bridge -> CloudFront in Wix).
   Test server defaults now: `--domain test.bridge.telqon.com`, `--front-door https://bridge.telqon.com` (BRIDGE_FRONT_DOOR in bridge.env).
