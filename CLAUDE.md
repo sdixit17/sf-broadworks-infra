@@ -28,8 +28,8 @@ instead deploy images the app repo's CI pushes to ECR.
   `AdvancedModeRegionRestrictionSecurityControlPolicy`; eu-west-2 was added to its RegionFloor list.
 - DNS for telqon.com is at **Wix** (ns2/ns3.wixdns.net): A record `bridge` → the test server's Elastic IP
   **51.24.196.195** (server created 18 Oct; record added in Wix the same day, propagation pending).
-- Salesforce's quick-start provider loads the connector from https://127.0.0.1:8080, so agents run the app's
-  `tools/connector_shim.py --bridge https://bridge.telqon.com` until Telqon's own provider package exists.
+- Since 19 Oct Salesforce loads the connector straight from https://bridge.telqon.com/ (Telqon's provider package,
+  contact center TelqonCC); the connector shim is no longer needed. Nothing runs on the owner's laptop.
 - Validated against botocore models and (test server) a local Docker build/run; not yet run against real AWS.
 
 ## Conventions
