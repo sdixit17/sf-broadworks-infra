@@ -37,6 +37,7 @@ This folder holds how it runs: `aws_recorder.py`, `deploy.sh`, `telqon-recorder.
     python recorder/aws_recorder.py up --allow <media server IP>[,<IP or CIDR>...]   # create, or deploy new code
     python recorder/aws_recorder.py status
     python recorder/aws_recorder.py logs              # each call's SIP details and a summary when it ends
+    python recorder/aws_recorder.py selftest          # a two-party test call made on the server itself (no outside network)
     python recorder/aws_recorder.py list              # recordings from the last 2 days (--days N)
     python recorder/aws_recorder.py fetch <name>      # download one into ./recordings/<name>/
     python recorder/aws_recorder.py delete            # remove the server (recordings kept; --purge deletes them)
@@ -49,6 +50,9 @@ run from the app folder:
     python sf-broadworks-infra/recorder/aws_recorder.py up --app-dir . --allow <IPs>
 
 ## First test
+
+0. `selftest` checks the recorder and S3 on AWS without any outside network. Testing from home with SIPp
+   can fail on carrier-grade NAT or a router's SIP ALG; that isn't a recorder fault.
 
 1. `up --allow <AVC media server IPs>`, then send AVC the address it prints.
 2. When AVC has configured it, make a queue call to Webextest1 (from 03330200219), talk for 20 seconds, then hang up.

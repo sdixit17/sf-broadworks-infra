@@ -4,6 +4,7 @@
     python recorder/aws_recorder.py up --allow 1.2.3.4/32,5.6.7.0/28   create it, or deploy the current code
     python recorder/aws_recorder.py status                              server, IP, allowed sources, service state
     python recorder/aws_recorder.py logs [--lines 200]                  the recorder's log (SIP details of each call)
+    python recorder/aws_recorder.py selftest                            a two-party test call made on the server itself
     python recorder/aws_recorder.py list [--days 2]                     recent recordings
     python recorder/aws_recorder.py fetch <call>                        download one recording (WAV + details)
     python recorder/aws_recorder.py delete [--purge]                    remove it (--purge: also the recordings)
@@ -211,6 +212,22 @@ Recordings: s3://{self.rec_bucket}/recordings/<day>/<time>-<call>/  (call.wav, c
         _, out = self.run(iid, [f"journalctl -u telqon-recorder -n {self.a.lines} --no-pager -o short-iso"], quiet=True)
         print(out)
 
+    def selftest(self):
+        iid = self.need()
+        step("playing a two-party recording call into the recorder, on the server itself")
+        status, out = self.run(iid, [
+            "cd /opt/telqon-recorder/current",
+            "sudo -u recorder python3 -m recorder.selftest --target 127.0.0.1:5060 --seconds 6; rc=$?",
+            "sleep 4",
+            "journalctl -u telqon-recorder --since '-40 s' --no-pager -o cat | grep -E 'recorded|uploaded|ERROR|failed' | tail -5",
+            "exit $rc"], quiet=True)
+        print(out.strip())
+        if status == "Success":
+            print("\nThe recorder works on AWS. Next: python recorder/aws_recorder.py list, then fetch the selftest call "
+                  "(left channel 440 Hz, right channel 880 Hz).")
+        else:
+            print(f"\n(self-test status: {status}); see python recorder/aws_recorder.py logs")
+
     def recordings(self, days):
         out = []
         for d in range(days):
@@ -265,7 +282,7 @@ Recordings: s3://{self.rec_bucket}/recordings/<day>/<time>-<call>/  (call.wav, c
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=["up", "status", "logs", "list", "fetch", "delete"])
+    ap.add_argument("command", choices=["up", "status", "logs", "selftest", "list", "fetch", "delete"])
     ap.add_argument("call", nargs="?", help="fetch: recording name (or part of it) from list")
     ap.add_argument("--allow", help="up: BroadWorks media server IPs/CIDRs allowed to send SIP and audio (comma-separated)")
     ap.add_argument("--allow-any", action="store_true", help=argparse.SUPPRESS)
