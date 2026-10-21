@@ -8,6 +8,7 @@ repository only describes and drives where and how it runs.
 |---|---|
 | `front-door/` | **bridge.telqon.com** for every customer: the phone page + customer directory on S3 + CloudFront (nothing to go down). `front_door.py up / deploy / add / remove / list / status`. See [front-door/README.md](front-door/README.md). |
 | `test-server/` | A bridge on one EC2 server in London with Docker + Caddy (automatic HTTPS), managed with Session Manager: `test.bridge.telqon.com`, or a customer's with `--name/--domain`. `aws_test_server.py up / status / logs / restart / stop / start / setup-code / delete`. See [test-server/README.md](test-server/README.md). |
+| `recorder/` | **Telqon recorder**: SIPREC recording server for BroadWorks Call Recording on EC2 (no Chime needed). Stage 1 records to a private S3 bucket (WAV + call details); stage 2 adds Deepgram transcription. `aws_recorder.py up --allow <media servers> / status / logs / list / fetch / delete`. See [recorder/README.md](recorder/README.md). |
 | `media-pipeline/` | Call recording and real-time transcription: BroadWorks Call Recording → Chime SDK Voice Connector → Transcribe Call Analytics + S3 → forwarder Lambda → bridge. `setup_media.py`. See [media-pipeline/README.md](media-pipeline/README.md). |
 | `tests/` | `test_forwarder.py` (forwarder on sample events), `test_front_door.py` (front_door.py on simulated AWS, requests checked against botocore models). No AWS needed. |
 
@@ -28,3 +29,4 @@ credentials (`aws configure`; `aws sts get-caller-identity` to check).
 
     python tests/test_forwarder.py
     python tests/test_front_door.py
+    python tests/test_recorder_aws.py

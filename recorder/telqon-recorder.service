@@ -1,0 +1,24 @@
+[Unit]
+Description=Telqon recorder (SIPREC recording server for BroadWorks Call Recording)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=recorder
+Group=recorder
+EnvironmentFile=/opt/telqon-recorder/recorder.env
+WorkingDirectory=/opt/telqon-recorder/current
+ExecStart=/usr/bin/python3 -m recorder
+Restart=always
+RestartSec=3
+TimeoutStopSec=90
+# SIP on port 5060 without running as root
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/telqon-recorder
+
+[Install]
+WantedBy=multi-user.target
