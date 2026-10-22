@@ -42,6 +42,36 @@ from aws_test_server import ClientError, step  # noqa: E402
 
 SIP_PORT, RTP_LO, RTP_HI = 5060, 30000, 30999
 
+def cmd():
+    """How the user ran this script (e.g. python sf-broadworks-infra/recorder/aws_recorder.py), for hints."""
+    return f"python {sys.argv[0]}"
+
+
+def wav_info(path):
+    """Check a WAV on this machine before uploading: 8 kHz 16-bit PCM with audio in it."""
+    import struct
+    data = Path(path).read_bytes()
+    if data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+        raise SystemExit(f"{path} is not a WAV. On a Mac: say -o speech.wav --file-format=WAVE --data-format=LEI16@8000 \"...\"")
+    pos, fmt, n = 12, None, 0
+    while pos + 8 <= len(data):
+        cid, size = data[pos:pos + 4], struct.unpack("<I", data[pos + 4:pos + 8])[0]
+        if cid == b"fmt ":
+            fmt = struct.unpack("<HHIIHH", data[pos + 8:pos + 24])
+        if cid == b"data":
+            n = (len(data) - pos - 8) if size in (0, 0xFFFFFFFF) or pos + 8 + size > len(data) else size
+            break
+        pos += 8 + size + (size & 1)
+    if not fmt:
+        raise SystemExit(f"{path}: no format chunk")
+    rate, channels, bits = fmt[2], fmt[1], fmt[5]
+    if rate != 8000 or bits != 16:
+        raise SystemExit(f"{path} is {rate} Hz {bits}-bit; convert it: afconvert -f WAVE -d LEI16@8000 -c 1 {path} speech8k.wav")
+    secs = n / 2 / channels / rate
+    if secs < 0.5:
+        raise SystemExit(f"{path} has almost no audio ({secs:.1f} s)")
+    return f"{secs:.1f} s, 8 kHz, {channels} channel(s)"
+
 
 class RecorderServer(base.Server):
     def __init__(self, a):
@@ -245,7 +275,7 @@ For AVC (BroadWorks Call Recording platform):
     their media server(s) must send from: {allow or '(the --allow addresses)'}
     firewall on their side: SIP {SIP_PORT} and RTP UDP {RTP_LO}-{RTP_HI} to {ip}
 Recordings: s3://{self.rec_bucket}/recordings/<day>/<time>-<call>/  (call.wav, call.json, sip.txt, metadata*.xml)
-            kept {self.a.keep_days} days.  python recorder/aws_recorder.py list""")
+            kept {self.a.keep_days} days.  {cmd()} list""")
         prm = self.params_now()
         if prm.get("deepgram_api_key"):
             print(f"Live transcription: on (Deepgram {prm.get('deepgram_model', 'nova-2')}, {prm.get('deepgram_language', 'en-GB')}); "
@@ -257,7 +287,7 @@ Recordings: s3://{self.rec_bucket}/recordings/<day>/<time>-<call>/  (call.wav, c
     def status(self):
         inst = self.instance()
         if not inst:
-            return print("No recorder yet: python recorder/aws_recorder.py up --allow <BroadWorks media server IPs>")
+            return print(f"No recorder yet: {cmd()} up --allow <BroadWorks media server IPs>")
         addr = self.eip()
         ip = addr["PublicIp"] if addr else inst.get("PublicIpAddress")
         print(f"Server {inst['InstanceId']}: {inst['State']['Name']}")
@@ -278,6 +308,7 @@ Recordings: s3://{self.rec_bucket}/recordings/<day>/<time>-<call>/  (call.wav, c
             p = Path(self.a.wav).expanduser()
             if not p.is_file():
                 raise SystemExit(f"{p} not found")
+            print(f"• {p.name}: {wav_info(p)}")
             key = f"selftest/{datetime.now(timezone.utc):%Y%m%d-%H%M%S}.wav"
             self.s3.upload_file(str(p), self.bucket, key)
             prep = [f"aws s3 cp --region {self.a.region} --only-show-errors s3://{self.bucket}/{key} /tmp/selftest.wav",
@@ -299,10 +330,11 @@ Recordings: s3://{self.rec_bucket}/recordings/<day>/<time>-<call>/  (call.wav, c
                 pass
         print(out.strip())
         if status == "Success":
-            print("\nThe recorder works on AWS. Next: python recorder/aws_recorder.py list, then fetch the selftest call "
-                  "(left channel 440 Hz, right channel 880 Hz).")
+            print(f"\nThe recorder works on AWS. Next: {cmd()} list, then {cmd()} fetch selftest"
+                  + ("; transcript.txt shows what Deepgram heard." if self.a.wav else
+                     " (left channel 440 Hz, right channel 880 Hz)."))
         else:
-            print(f"\n(self-test status: {status}); see python recorder/aws_recorder.py logs")
+            print(f"\n(self-test status: {status}); see {cmd()} logs")
 
     def recordings(self, days):
         out = []
@@ -323,11 +355,11 @@ Recordings: s3://{self.rec_bucket}/recordings/<day>/<time>-<call>/  (call.wav, c
             info = json.loads(self.s3.get_object(Bucket=self.rec_bucket, Key=f"{prefix}/call.json")["Body"].read())
             who = " / ".join(ch.get("aor") or f"stream {ch.get('label') or ch.get('channel')}" for ch in info.get("channels", []))
             print(f"{prefix.split('/', 2)[2]:58} {info.get('seconds', 0):7.1f}s  {who}  [{info.get('endReason')}]")
-        print("\nDownload one: python recorder/aws_recorder.py fetch <name or part of it>")
+        print(f"\nDownload one: {cmd()} fetch <name or part of it>")
 
     def fetch(self):
         if not self.a.call:
-            raise SystemExit("which call? python recorder/aws_recorder.py fetch <name> (see list)")
+            raise SystemExit(f"which call? {cmd()} fetch <name> (see list)")
         match = [p for p in self.recordings(max(self.a.days, 30)) if self.a.call in p]
         if not match:
             raise SystemExit(f"no recording matching '{self.a.call}' in the last 30 days")
@@ -378,7 +410,7 @@ def main():
     ap.add_argument("--deepgram-model", help="up: Deepgram model (default nova-2)")
     ap.add_argument("--deepgram-language", help="up: language (default en-GB)")
     ap.add_argument("--deepgram-url", help="up: Deepgram streaming URL (default wss://api.deepgram.com/v1/listen)")
-    ap.add_argument("--no-transcription", action="store_true", help="up: turn live transcription off")
+    ap.add_argument("--no-transcription", action="store_true", help="up: turn live transcription of")
     a = ap.parse_args()
     s = RecorderServer(a)
     getattr(s, a.command)()
