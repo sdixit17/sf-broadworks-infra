@@ -1,4 +1,4 @@
-# Telqon recorder (stage 1: record only)
+# Telqon recorder (stage 1: recording, stage 2: live transcription)
 
 A SIPREC recording server on AWS for **BroadWorks Call Recording**. The BroadWorks media server sends each recorded
 call to it: one SIP call carrying two audio streams (agent and customer) plus details of who is on the call. The
@@ -59,6 +59,35 @@ run from the app folder:
 3. Run `logs` to see the call arrive and finish. Run `list`, then `fetch <name>`, and listen to `call.wav`.
 4. Paste the `logs` output, or share `call.json` and `metadata1.xml`. Numbers in them are real, so share privately.
    From them I'll confirm the stream roles and the IDs for matching.
+
+## Live transcription (stage 2)
+
+Each party's audio is streamed live to Deepgram (model nova-2, language en-GB by default). Each finished sentence:
+- goes to the bridge (`POST /api/media/transcript`), which puts it on the Salesforce Voice Call and in the supervisor's
+  transcript panel;
+- is saved as `transcript.txt` / `transcript.json` with the recording.
+
+The bridge decides agent or customer from the number of whoever spoke (`speakerNumber`): the signed-in agent's
+own number or extension means agent. That needs bridge v0.14.0 or later.
+
+1. On the bridge's Settings page (Media), set **Pipeline token** to a long random value and save.
+2. In your terminal (never on the command line, never in chat):
+
+       export DEEPGRAM_API_KEY='<new Deepgram key>'
+       export BRIDGE_MEDIA_TOKEN='<the same Pipeline token>'
+
+3. Deploy:
+
+       python sf-broadworks-infra/recorder/aws_recorder.py up --app-dir . --bridge-url https://bridge.telqon.com
+
+   The key and token are stored encrypted in SSM Parameter Store (`/telqon-recorder/...`), and only the recorder
+   server may read them. `status` shows whether transcription is on.
+4. Run `selftest`. The test tones produce no words, so this only checks the connection: `logs` must show no
+   "Deepgram connection ... failed". With a real call (or `make_pcap.py --wav speech.wav` + SIPp), `logs` shows
+   `heard ...` lines, and the transcript appears on the Voice Call while the agent's call is live.
+
+Turn it off with `up --no-transcription`. Change the model or language with `--deepgram-model` / `--deepgram-language`.
+To use Deepgram's EU endpoint, pass `--deepgram-url` with its address.
 
 ## Security notes
 

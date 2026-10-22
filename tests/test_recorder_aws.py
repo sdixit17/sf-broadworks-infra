@@ -92,6 +92,20 @@ class FakeAws:
     # SSM
     def ssm_GetParameter(self, p): return {"Parameter": {"Value": "ami-0123456789abcdef0"}}
 
+    def ssm_PutParameter(self, p):
+        self.params = getattr(self, "params", {})
+        self.params[p["Name"]] = (p["Value"], p["Type"])
+        return {"Version": 1}
+
+    def ssm_DeleteParameter(self, p):
+        getattr(self, "params", {}).pop(p["Name"], None)
+        return {}
+
+    def ssm_GetParametersByPath(self, p):
+        items = [{"Name": k, "Type": ty, "Value": v} for k, (v, ty) in getattr(self, "params", {}).items()
+                 if k.startswith(p["Path"] + "/")]
+        return {"Parameters": items}
+
     def ssm_DescribeInstanceInformation(self, p): return {"InstanceInformationList": [{"InstanceId": "i-0123456789abcdef0"}]}
 
     def ssm_SendCommand(self, p): return {"Command": {"CommandId": "11111111-2222-3333-4444-555555555555"}}
@@ -192,6 +206,25 @@ def main():
     run(aws, "up", "--allow", "185.5.188.20", "--app-dir", str(app))
     check({r["CidrIp"] for p in aws.sg["IpPermissions"] for r in p["IpRanges"]} == {"185.5.188.20/32"},
           "new --allow replaces the old sources")
+
+    print("live transcription settings")
+    with mock.patch.dict("os.environ", {"DEEPGRAM_API_KEY": "dg-secret-key-123", "BRIDGE_MEDIA_TOKEN": "bridge-tok-456"}):
+        out = run(aws, "up", "--app-dir", str(app), "--bridge-url", "https://bridge.telqon.com/")
+    prm = aws.params
+    check(prm.get("/telqon-recorder/deepgram_api_key") == ("dg-secret-key-123", "SecureString")
+          and prm.get("/telqon-recorder/bridge_media_token") == ("bridge-tok-456", "SecureString"),
+          "key and token stored encrypted (SecureString)")
+    check(prm.get("/telqon-recorder/bridge_url") == ("https://bridge.telqon.com", "String"), "bridge URL stored")
+    cmd = " ".join(aws.ops("SendCommand")[-1]["Parameters"]["commands"])
+    check("dg-secret-key-123" not in cmd and "bridge-tok-456" not in cmd and "/telqon-recorder/" in cmd,
+          "secrets never in the server command; the server reads them from SSM")
+    check("dg-secret-key-123" not in out and "Live transcription: on" in out, "secrets not printed; status shows on")
+    pol = [json.loads(p["PolicyDocument"]) for p in aws.ops("PutRolePolicy") if p["PolicyName"] == "settings"][-1]
+    check(all(r.endswith(("parameter/telqon-recorder", "parameter/telqon-recorder/*")) for r in pol["Statement"][0]["Resource"]),
+          "server may read only its own settings")
+    out = run(aws, "up", "--app-dir", str(app), "--no-transcription")
+    check("/telqon-recorder/deepgram_api_key" not in aws.params and "Live transcription: off" in out,
+          "--no-transcription removes the key")
 
     print("list")
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")

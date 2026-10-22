@@ -40,6 +40,11 @@ instead deploy images the app repo's CI pushes to ECR.
   offline-tested; not yet deployed. Needs from AVC: media server source IPs, a Call Recording platform -> recorder IP:5060
   (dual stream, G.711, no SRTP), Call Recording on Webextest1, firewall. Then inspect `call.json`/`metadata1.xml` for
   stream roles and IDs (extTrackingId) before stage 2 (Deepgram live transcription -> bridge `/api/media/*`).
+- Recorder stage 2 (22 Oct): live Deepgram transcription per stream; settings in SSM `/telqon-recorder/{deepgram_api_key,
+  bridge_media_token (SecureString), bridge_url, deepgram_model, deepgram_language, deepgram_url}`, read by the recorder at
+  start (`RECORDER_PARAMS`); `up` stores them from env DEEPGRAM_API_KEY / BRIDGE_MEDIA_TOKEN + `--bridge-url`. Stage 1
+  verified on AWS (recorder 13.42.226.59, selftest recording fetched, SIPp from the owner's Mac needs sudo for audio:
+  raw sockets; home network = carrier-grade NAT / SIP ALG). The owner pasted a Deepgram key in chat on 21 Oct: told to rotate it.
 - DNS for telqon.com is at **Wix** (ns2/ns3.wixdns.net): A record `bridge` → the test server's Elastic IP
   **51.24.196.195** (server created 18 Oct; live).
 - Since 19 Oct Salesforce loads the connector straight from https://bridge.telqon.com/ (Telqon's provider package,

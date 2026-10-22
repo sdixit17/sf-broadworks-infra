@@ -15,6 +15,13 @@ What `up` creates in --region (default eu-west-2), named <name> (default telqon-
     a private, encrypted S3 bucket <name>-recordings-<account>; recordings are deleted after --keep-days (30)
     an IAM role (Session Manager, read code bundles, write recordings)
 
+Live transcription (stage 2): put the Deepgram key and the bridge's media token in your shell, never on the command line;
+`up` stores them encrypted in SSM Parameter Store (/<name>/...), which only the recorder server can read:
+    export DEEPGRAM_API_KEY='...'             # Deepgram console > API Keys
+    export BRIDGE_MEDIA_TOKEN='...'           # the bridge's Settings > Media > Pipeline token (type a long random value there)
+    python recorder/aws_recorder.py up --bridge-url https://bridge.telqon.com
+`up --no-transcription` turns it off again.
+
 The recorder code comes from the app checkout (sf-broadworks-bridge/recorder/, --app-dir); this folder adds how it
 runs (systemd service, deploy.sh). Audio arrives unencrypted (RTP), so keep --allow tight; a VPN comes later.
 """
@@ -80,8 +87,51 @@ class RecorderServer(base.Server):
             "ID": "recordings-expire", "Status": "Enabled", "Filter": {"Prefix": "recordings/"},
             "Expiration": {"Days": self.a.keep_days}}]})
 
+    def params_path(self):
+        return f"/{self.name}"
+
+    def set_params(self):
+        """Store the transcription settings (secrets from the environment) under /<name>/ in SSM."""
+        p = self.params_path()
+        if self.a.no_transcription:
+            try:
+                self.ssm.delete_parameter(Name=f"{p}/deepgram_api_key")
+                step("live transcription turned off (Deepgram key removed)")
+            except ClientError:
+                pass
+            return
+        values = {"deepgram_api_key": (os.environ.get("DEEPGRAM_API_KEY", "").strip(), True),
+                  "bridge_media_token": (os.environ.get("BRIDGE_MEDIA_TOKEN", "").strip(), True),
+                  "bridge_url": ((self.a.bridge_url or "").strip().rstrip("/"), False),
+                  "deepgram_model": ((self.a.deepgram_model or "").strip(), False),
+                  "deepgram_language": ((self.a.deepgram_language or "").strip(), False),
+                  "deepgram_url": ((self.a.deepgram_url or "").strip(), False)}
+        if values["bridge_url"][0] and not values["bridge_url"][0].startswith("https://"):
+            raise SystemExit("--bridge-url must start with https://")
+        for name, (value, secret) in values.items():
+            if value:
+                self.ssm.put_parameter(Name=f"{p}/{name}", Value=value, Overwrite=True,
+                                       Type="SecureString" if secret else "String")
+                step(f"{name} stored{' (encrypted)' if secret else ': ' + value}")
+
+    def params_now(self):
+        out = {}
+        try:
+            for page in self.ssm.get_paginator("get_parameters_by_path").paginate(Path=self.params_path()):
+                for prm in page["Parameters"]:
+                    out[prm["Name"].rsplit("/", 1)[-1]] = "(set)" if prm["Type"] == "SecureString" else prm["Value"]
+        except ClientError:
+            pass
+        return out
+
     def role_setup(self):
         super().role_setup()
+        region, acct = self.a.region, self.account
+        self.iam.put_role_policy(RoleName=self.role, PolicyName="settings", PolicyDocument=json.dumps({
+            "Version": "2012-10-17", "Statement": [{"Effect": "Allow",
+                                                    "Action": ["ssm:GetParametersByPath", "ssm:GetParameters", "ssm:GetParameter"],
+                                                    "Resource": [f"arn:aws:ssm:{region}:{acct}:parameter{self.params_path()}",
+                                                                 f"arn:aws:ssm:{region}:{acct}:parameter{self.params_path()}/*"]}]}))
         self.iam.put_role_policy(RoleName=self.role, PolicyName="recordings", PolicyDocument=json.dumps({
             "Version": "2012-10-17", "Statement": [{"Effect": "Allow", "Action": "s3:PutObject",
                                                     "Resource": f"arn:aws:s3:::{self.rec_bucket}/recordings/*"}]}))
@@ -153,6 +203,7 @@ class RecorderServer(base.Server):
                              "--allow 185.5.188.10,185.5.188.11 (ask AVC which servers send call recordings)")
         self.bucket_setup()
         self.recordings_bucket()
+        self.set_params()
         bundle = self.bundle()
         inst = self.instance()
         if inst is None:
@@ -175,7 +226,8 @@ class RecorderServer(base.Server):
             "for i in $(seq 1 60); do command -v aws >/dev/null && break; sleep 5; done",
             f"aws s3 cp --region {self.a.region} --only-show-errors {bundle} /tmp/rd/b.tar.gz",
             "tar -xzf /tmp/rd/b.tar.gz -C /tmp/rd deploy/deploy.sh",
-            f"bash /tmp/rd/deploy/deploy.sh {bundle} {self.a.region} {ip} '{allow}' {self.rec_bucket} 2>&1 | tail -30"])
+            f"bash /tmp/rd/deploy/deploy.sh {bundle} {self.a.region} {ip} '{allow}' {self.rec_bucket} {self.params_path()}/ "
+            "2>&1 | tail -30"])
         print()
         print(out.strip())
         if status != "Success":
@@ -194,6 +246,13 @@ For AVC (BroadWorks Call Recording platform):
     firewall on their side: SIP {SIP_PORT} and RTP UDP {RTP_LO}-{RTP_HI} to {ip}
 Recordings: s3://{self.rec_bucket}/recordings/<day>/<time>-<call>/  (call.wav, call.json, sip.txt, metadata*.xml)
             kept {self.a.keep_days} days.  python recorder/aws_recorder.py list""")
+        prm = self.params_now()
+        if prm.get("deepgram_api_key"):
+            print(f"Live transcription: on (Deepgram {prm.get('deepgram_model', 'nova-2')}, {prm.get('deepgram_language', 'en-GB')}); "
+                  f"lines to {prm.get('bridge_url') or 'no bridge (kept with the recordings)'}"
+                  f"{'' if prm.get('bridge_media_token') or not prm.get('bridge_url') else ' (BRIDGE_MEDIA_TOKEN missing!)'}")
+        else:
+            print("Live transcription: off (export DEEPGRAM_API_KEY=... then up)")
 
     def status(self):
         inst = self.instance()
@@ -263,10 +322,11 @@ Recordings: s3://{self.rec_bucket}/recordings/<day>/<time>-<call>/  (call.wav, c
         step(f"saved to {dest}/ (call.wav: left channel = first stream, right = second; details in call.json)")
 
     def delete(self):
-        try:
-            self.iam.delete_role_policy(RoleName=self.role, PolicyName="recordings")
-        except ClientError:
-            pass
+        for pol in ("recordings", "settings"):
+            try:
+                self.iam.delete_role_policy(RoleName=self.role, PolicyName=pol)
+            except ClientError:
+                pass
         super().delete()
         if self.a.purge:
             try:
@@ -295,6 +355,11 @@ def main():
     ap.add_argument("--lines", type=int, default=200)
     ap.add_argument("--days", type=int, default=2)
     ap.add_argument("--purge", action="store_true", help="delete: also delete all recordings")
+    ap.add_argument("--bridge-url", help="up: the bridge that gets the transcript lines, e.g. https://bridge.telqon.com")
+    ap.add_argument("--deepgram-model", help="up: Deepgram model (default nova-2)")
+    ap.add_argument("--deepgram-language", help="up: language (default en-GB)")
+    ap.add_argument("--deepgram-url", help="up: Deepgram streaming URL (default wss://api.deepgram.com/v1/listen)")
+    ap.add_argument("--no-transcription", action="store_true", help="up: turn live transcription off")
     a = ap.parse_args()
     s = RecorderServer(a)
     getattr(s, a.command)()

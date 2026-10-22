@@ -1,8 +1,8 @@
 #!/bin/bash
 # Runs on the recorder server (as root): install a code bundle from S3 and (re)start the recorder.
-#   deploy.sh s3://bucket/bundles/<name>.tar.gz <region> <public IP> <allowed CIDRs, comma-separated> <recordings bucket>
+#   deploy.sh s3://bucket/bundles/<name>.tar.gz <region> <public IP> <allowed CIDRs, comma-separated> <recordings bucket> [SSM path]
 set -euo pipefail
-BUNDLE="$1"; REGION="$2"; PUBLIC_IP="$3"; ALLOW="$4"; BUCKET="$5"
+BUNDLE="$1"; REGION="$2"; PUBLIC_IP="$3"; ALLOW="$4"; BUCKET="$5"; PARAMS="${6:-}"
 B=/opt/telqon-recorder
 DATA=/var/lib/telqon-recorder
 mkdir -p "$B/releases" "$DATA"
@@ -20,6 +20,7 @@ RECORDER_PUBLIC_IP=$PUBLIC_IP
 RECORDER_ALLOW=$ALLOW
 RECORDER_S3_BUCKET=$BUCKET
 RECORDER_DIR=$DATA
+RECORDER_PARAMS=$PARAMS
 AWS_DEFAULT_REGION=$REGION
 LOG_LEVEL=INFO
 ENV
