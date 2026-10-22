@@ -4,7 +4,7 @@
     python recorder/aws_recorder.py up --allow 1.2.3.4/32,5.6.7.0/28   create it, or deploy the current code
     python recorder/aws_recorder.py status                              server, IP, allowed sources, service state
     python recorder/aws_recorder.py logs [--lines 200]                  the recorder's log (SIP details of each call)
-    python recorder/aws_recorder.py selftest                            a two-party test call made on the server itself
+    python recorder/aws_recorder.py selftest [--wav speech.wav]         a two-party test call made on the server itself
     python recorder/aws_recorder.py list [--days 2]                     recent recordings
     python recorder/aws_recorder.py fetch <call>                        download one recording (WAV + details)
     python recorder/aws_recorder.py delete [--purge]                    remove it (--purge: also the recordings)
@@ -273,13 +273,30 @@ Recordings: s3://{self.rec_bucket}/recordings/<day>/<time>-<call>/  (call.wav, c
 
     def selftest(self):
         iid = self.need()
+        wav_arg, prep = "", []
+        if self.a.wav:
+            p = Path(self.a.wav).expanduser()
+            if not p.is_file():
+                raise SystemExit(f"{p} not found")
+            key = f"selftest/{datetime.now(timezone.utc):%Y%m%d-%H%M%S}.wav"
+            self.s3.upload_file(str(p), self.bucket, key)
+            prep = [f"aws s3 cp --region {self.a.region} --only-show-errors s3://{self.bucket}/{key} /tmp/selftest.wav",
+                    "chmod 644 /tmp/selftest.wav"]
+            wav_arg = " --wav /tmp/selftest.wav"
+            step(f"{p.name} uploaded; it plays as the customer's voice")
         step("playing a two-party recording call into the recorder, on the server itself")
-        status, out = self.run(iid, [
+        status, out = self.run(iid, prep + [
             "cd /opt/telqon-recorder/current",
-            "sudo -u recorder python3 -m recorder.selftest --target 127.0.0.1:5060 --seconds 6; rc=$?",
-            "sleep 4",
-            "journalctl -u telqon-recorder --since '-40 s' --no-pager -o cat | grep -E 'recorded|uploaded|ERROR|failed' | tail -5",
+            f"sudo -u recorder python3 -m recorder.selftest --target 127.0.0.1:5060 --seconds 6{wav_arg}; rc=$?",
+            "sleep 10",
+            "journalctl -u telqon-recorder --since '-90 s' --no-pager -o cat | "
+            "grep -E 'heard|recorded|uploaded|ERROR|failed|bridge' | tail -15",
             "exit $rc"], quiet=True)
+        if self.a.wav:
+            try:
+                self.s3.delete_object(Bucket=self.bucket, Key=key)
+            except ClientError:
+                pass
         print(out.strip())
         if status == "Success":
             print("\nThe recorder works on AWS. Next: python recorder/aws_recorder.py list, then fetch the selftest call "
@@ -354,6 +371,8 @@ def main():
     ap.add_argument("--keep-days", type=int, default=30, help="delete recordings after this many days")
     ap.add_argument("--lines", type=int, default=200)
     ap.add_argument("--days", type=int, default=2)
+    ap.add_argument("--wav", help="selftest: speech for the customer side (8 kHz mono 16-bit WAV; macOS: "
+                                  "say -o speech.wav --data-format=LEI16@8000 \"...\")")
     ap.add_argument("--purge", action="store_true", help="delete: also delete all recordings")
     ap.add_argument("--bridge-url", help="up: the bridge that gets the transcript lines, e.g. https://bridge.telqon.com")
     ap.add_argument("--deepgram-model", help="up: Deepgram model (default nova-2)")

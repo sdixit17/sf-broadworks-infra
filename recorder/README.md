@@ -82,9 +82,13 @@ own number or extension means agent. That needs bridge v0.14.0 or later.
 
    The key and token are stored encrypted in SSM Parameter Store (`/telqon-recorder/...`), and only the recorder
    server may read them. `status` shows whether transcription is on.
-4. Run `selftest`. The test tones produce no words, so this only checks the connection: `logs` must show no
-   "Deepgram connection ... failed". With a real call (or `make_pcap.py --wav speech.wav` + SIPp), `logs` shows
-   `heard ...` lines, and the transcript appears on the Voice Call while the agent's call is live.
+4. Test with speech, played on the server itself (no SIPp, no home network):
+
+       say -o speech.wav --data-format=LEI16@8000 "Hello, I would like to cancel my order."
+       python sf-broadworks-infra/recorder/aws_recorder.py selftest --wav speech.wav
+
+   The output shows `heard ...` lines with Deepgram's words. "bridge has no call" is expected, because there is no
+   live agent call for a test. With a real BroadWorks call, the transcript appears on the Voice Call.
 
 Turn it off with `up --no-transcription`. Change the model or language with `--deepgram-model` / `--deepgram-language`.
 To use Deepgram's EU endpoint, pass `--deepgram-url` with its address.
