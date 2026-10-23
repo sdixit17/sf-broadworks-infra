@@ -36,7 +36,7 @@ This folder holds how it runs: `aws_recorder.py`, `deploy.sh`, `telqon-recorder.
 
     python recorder/aws_recorder.py up --allow <media server IP>[,<IP or CIDR>...]   # create, or deploy new code
     python recorder/aws_recorder.py status
-    python recorder/aws_recorder.py logs              # each call's SIP details and a summary when it ends
+    python recorder/aws_recorder.py logs              # newest end; --since "30 min ago" for recent only; each call's SIP details and a summary when it ends
     python recorder/aws_recorder.py selftest          # a two-party test call made on the server itself (no outside network)
     python recorder/aws_recorder.py list              # recordings from the last 2 days (--days N)
     python recorder/aws_recorder.py fetch <name>      # download one into ./recordings/<name>/

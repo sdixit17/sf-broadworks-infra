@@ -3,7 +3,7 @@
 
     python recorder/aws_recorder.py up --allow 1.2.3.4/32,5.6.7.0/28   create it, or deploy the current code
     python recorder/aws_recorder.py status                              server, IP, allowed sources, service state
-    python recorder/aws_recorder.py logs [--lines 200]                  the recorder's log (SIP details of each call)
+    python recorder/aws_recorder.py logs [--lines 200] [--since '30 min ago']  the recorder's log (SIP details of each call)
     python recorder/aws_recorder.py selftest [--wav speech.wav]         a two-party test call made on the server itself
     python recorder/aws_recorder.py list [--days 2]                     recent recordings
     python recorder/aws_recorder.py fetch <call>                        download one recording (WAV + details)
@@ -29,6 +29,7 @@ import argparse
 import io
 import json
 import os
+import shlex
 import sys
 import tarfile
 from datetime import datetime, timedelta, timezone
@@ -298,7 +299,10 @@ Recordings: s3://{self.rec_bucket}/recordings/<day>/<time>-<call>/  (call.wav, c
 
     def logs(self):
         iid = self.need()
-        _, out = self.run(iid, [f"journalctl -u telqon-recorder -n {self.a.lines} --no-pager -o short-iso"], quiet=True)
+        since = f" --since {shlex.quote(self.a.since)}" if self.a.since else ""
+        # SSM returns only the first 24 KB of output: keep the newest end, and drop the host name from each line
+        _, out = self.run(iid, [f"journalctl -u telqon-recorder -n {self.a.lines}{since} --no-pager -o short-iso"
+                                " | sed -E 's/ [^ ]+ (python3|systemd)\\[[0-9]+\\]: / /' | tail -c 23000"], quiet=True)
         print(out)
 
     def selftest(self):
@@ -402,6 +406,7 @@ def main():
     ap.add_argument("--instance-type", default="t4g.small")
     ap.add_argument("--keep-days", type=int, default=30, help="delete recordings after this many days")
     ap.add_argument("--lines", type=int, default=200)
+    ap.add_argument("--since", help="logs: only lines since then, e.g. '30 min ago', 'today', '2026-10-23 05:30'")
     ap.add_argument("--days", type=int, default=2)
     ap.add_argument("--wav", help="selftest: speech for the customer side (8 kHz mono 16-bit WAV; macOS: "
                                   "say -o speech.wav --data-format=LEI16@8000 \"...\")")

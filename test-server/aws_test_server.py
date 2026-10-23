@@ -337,7 +337,7 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
 
     def logs(self):
         inst = self.need()
-        status, out = self.run(inst, [f"docker logs --tail {self.a.lines} bridge 2>&1 | grep -v 'Setup code'"], quiet=True)
+        status, out = self.run(inst, [f"docker logs --tail {self.a.lines} bridge 2>&1 | grep -v 'Setup code' | tail -c 23000"], quiet=True)
         print(out)
 
     def setup_code(self):
