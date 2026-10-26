@@ -45,6 +45,9 @@ instead deploy images the app repo's CI pushes to ECR.
   start (`RECORDER_PARAMS`); `up` stores them from env DEEPGRAM_API_KEY / BRIDGE_MEDIA_TOKEN + `--bridge-url`. Stage 1
   verified on AWS (recorder 13.42.226.59, selftest recording fetched, SIPp from the owner's Mac needs sudo for audio:
   raw sockets; home network = carrier-grade NAT / SIP ALG). The owner pasted a Deepgram key in chat on 21 Oct: told to rotate it.
+- Bedrock (26 Oct): eu-west-2 lists the Anthropic models (list-foundation-models works), but every Converse call fails with
+  ValidationException "Operation not allowed", Amazon Nova too, so Bedrock is blocked for the whole account (AISPL /
+  verification, like Chime and CloudFront). Voice AI uses Anthropic's API directly until AWS enables Bedrock.
 - DNS for telqon.com is at **Wix** (ns2/ns3.wixdns.net): A record `bridge` → the test server's Elastic IP
   **51.24.196.195** (server created 18 Oct; live).
 - Since 19 Oct Salesforce loads the connector straight from https://bridge.telqon.com/ (Telqon's provider package,
