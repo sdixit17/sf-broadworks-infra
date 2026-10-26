@@ -228,6 +228,11 @@ def main():
     ap.add_argument("--lines", type=int, default=200)
     ap.add_argument("--since", help="logs: only lines since then, e.g. '30 min ago', 'today'")
     a = ap.parse_args()
+    if a.sip_user and "@" in a.sip_user:                          # user@domain given: split it
+        a.sip_user, _, dom = a.sip_user.strip().removeprefix("sip:").partition("@")
+        if a.domain and dom.lower() != a.domain.lower():
+            raise SystemExit(f"--sip-user is @{dom} but --domain is {a.domain}")
+        a.domain = a.domain or dom
     if a.registrar and not re.fullmatch(r"[A-Za-z0-9.\-]+(:\d+)?", a.registrar):
         raise SystemExit("--registrar: host or IP, optionally :port")
     s = VoiceAIServer(a)
