@@ -201,7 +201,8 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
                 inst = self.ec2.run_instances(
                     ImageId=ami, InstanceType=self.a.instance_type, MinCount=1, MaxCount=1, SecurityGroupIds=[sg],
                     IamInstanceProfile={"Name": self.role}, UserData=self.user_data(bundle, setup_code),
-                    MetadataOptions={"HttpTokens": "required", "HttpEndpoint": "enabled"},
+                    MetadataOptions={"HttpTokens": "required", "HttpEndpoint": "enabled",
+                                     "HttpPutResponseHopLimit": 2},    # 2: the bridge container reaches the role
                     BlockDeviceMappings=[{"DeviceName": "/dev/xvda", "Ebs": {"VolumeSize": 20, "VolumeType": "gp3",
                                                                              "Encrypted": True}}],
                     TagSpecifications=[{"ResourceType": "instance", "Tags": self.tag()},
@@ -279,11 +280,23 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
                 f"bash /tmp/nd/deploy/server-deploy.sh {bundle} {self.a.region} '{','.join(domains(self.a.domain))}' "
                 f"'{self.a.front_door}' "
                 "2>&1 | tail -40"])
+        self.recordings_access(iid)
         print()
         print(out.strip())
         if status != "Success":
             print(f"\n(command status: {status})")
         self.report(iid, ip, setup_code)
+
+    def recordings_access(self, iid):
+        """The bridge signs playback links for call recordings in the recorder's bucket (S3 presigned GET), so its
+        role may read recordings/*, and the container must reach the instance role (IMDSv2 hop limit 2)."""
+        bucket = self.a.recordings_bucket or f"telqon-recorder-recordings-{self.account}"
+        self.iam.put_role_policy(RoleName=self.role, PolicyName="recordings-read", PolicyDocument=(
+            '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject",'
+            f'"Resource":"arn:aws:s3:::{bucket}/recordings/*"}}]}}'))
+        self.ec2.modify_instance_metadata_options(InstanceId=iid, HttpTokens="required", HttpEndpoint="enabled",
+                                                  HttpPutResponseHopLimit=2)
+        step(f"bridge may read recordings in s3://{bucket}/recordings/ (for playback links)")
 
     def report(self, iid, ip, setup_code=None):
         print(f"\nServer {iid}   IP {ip}   region {self.a.region}")
@@ -419,6 +432,10 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
             self.iam.delete_instance_profile(InstanceProfileName=self.role)
             self.iam.detach_role_policy(RoleName=self.role, PolicyArn="arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore")
             self.iam.delete_role_policy(RoleName=self.role, PolicyName="bundles")
+            try:
+                self.iam.delete_role_policy(RoleName=self.role, PolicyName="recordings-read")
+            except ClientError:
+                pass
             self.iam.delete_role(RoleName=self.role)
             step("role deleted")
         except ClientError:
@@ -442,6 +459,8 @@ def main():
     ap.add_argument("--app-dir", default=str(INFRA.parent / "sf-broadworks-bridge"),
                     help="checkout of sdixit17/sf-broadworks-bridge (default: next to this repository)")
     ap.add_argument("--region", default="eu-west-2")
+    ap.add_argument("--recordings-bucket", default="",
+                    help="call recordings the bridge may play back (default: the recorder's telqon-recorder-recordings-<account>)")
     ap.add_argument("--name", default="telqon-bridge-test")
     ap.add_argument("--instance-type", default="t4g.small")
     ap.add_argument("--lines", type=int, default=300)
