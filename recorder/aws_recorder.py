@@ -75,6 +75,10 @@ def wav_info(path):
 
 
 class RecorderServer(base.Server):
+    SG_DESCRIPTION = "Telqon recorder: SIP+RTP from BroadWorks only"
+    SOURCE_LABEL = "BroadWorks media server"
+    PORTS = (("udp", SIP_PORT, SIP_PORT), ("tcp", SIP_PORT, SIP_PORT), ("udp", RTP_LO, RTP_HI))
+
     def __init__(self, a):
         super().__init__(a)
         self.rec_bucket = f"{a.name}-recordings-{self.account}"
@@ -190,7 +194,7 @@ class RecorderServer(base.Server):
         g, vpc = self.group()
         if g is None:
             gid = self.ec2.create_security_group(
-                GroupName=self.name, VpcId=vpc, Description="Telqon recorder: SIP+RTP from BroadWorks only",
+                GroupName=self.name, VpcId=vpc, Description=self.SG_DESCRIPTION,
                 TagSpecifications=[{"ResourceType": "security-group", "Tags": self.tag()}])["GroupId"]
             g = {"GroupId": gid, "IpPermissions": []}
             step("security group created")
@@ -198,12 +202,11 @@ class RecorderServer(base.Server):
         if allow and sorted(allow) != sorted(self.allowed_now(g)):
             if g["IpPermissions"]:
                 self.ec2.revoke_security_group_ingress(GroupId=g["GroupId"], IpPermissions=g["IpPermissions"])
-            ranges = [{"CidrIp": c, "Description": "BroadWorks media server"} for c in allow]
+            ranges = [{"CidrIp": c, "Description": self.SOURCE_LABEL} for c in allow]
             self.ec2.authorize_security_group_ingress(GroupId=g["GroupId"], IpPermissions=[
-                {"IpProtocol": "udp", "FromPort": SIP_PORT, "ToPort": SIP_PORT, "IpRanges": ranges},
-                {"IpProtocol": "tcp", "FromPort": SIP_PORT, "ToPort": SIP_PORT, "IpRanges": ranges},
-                {"IpProtocol": "udp", "FromPort": RTP_LO, "ToPort": RTP_HI, "IpRanges": ranges}])
-            step(f"open to {', '.join(allow)} only: SIP {SIP_PORT} UDP/TCP, RTP {RTP_LO}-{RTP_HI} UDP")
+                {"IpProtocol": proto, "FromPort": lo, "ToPort": hi, "IpRanges": ranges} for proto, lo, hi in self.PORTS])
+            step(f"open to {', '.join(allow)} only: " +
+                 ", ".join(f"{proto.upper()} {lo}" + (f"-{hi}" if hi != lo else "") for proto, lo, hi in self.PORTS))
         return g["GroupId"]
 
     def allow_list(self):
