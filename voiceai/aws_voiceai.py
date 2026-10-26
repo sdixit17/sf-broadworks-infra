@@ -186,6 +186,14 @@ For the SBC (access side, like a phone): accept REGISTER/INVITE from {ip}:{SIP_P
             print(f"Service: {out.strip()}")
         self.report(inst["InstanceId"], ip, ",".join(self.allowed_now(self.group()[0])))
 
+    def need(self):
+        inst = self.instance()
+        if not inst:
+            raise SystemExit(f"No Voice AI server yet: run {cmd()} up ... first (see voiceai/README.md)")
+        if inst["State"]["Name"] != "running":
+            raise SystemExit(f"The Voice AI server is {inst['State']['Name']}; {cmd()} up starts it")
+        return inst["InstanceId"]
+
     def logs(self):
         iid = self.need()
         since = f" --since {shlex.quote(self.a.since)}" if self.a.since else ""
