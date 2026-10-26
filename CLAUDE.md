@@ -36,7 +36,7 @@ instead deploy images the app repo's CI pushes to ECR.
   or Cloudflare/GitHub Pages for the static front door.
 - Front door (app v0.12.0, 19 Oct): code ready, offline-tested only; the owner still has to run the switch-over in
   `front-door/README.md` (test server -> test.bridge.telqon.com, ACM DNS record + CNAME bridge -> CloudFront in Wix).
-  Test server defaults now: `--domain test.bridge.telqon.com`, `--front-door https://bridge.telqon.com` (BRIDGE_FRONT_DOOR in bridge.env).
+  Test server default `--domain bridge.telqon.com,test.bridge.telqon.com` (26 Oct: the test.bridge-only default broke HTTPS on bridge.telqon.com, which Salesforce still loads while CloudFront is blocked), `--front-door https://bridge.telqon.com` (BRIDGE_FRONT_DOOR in bridge.env).
 - Recorder (21 Oct, stage 1 = record only): Deepgram route chosen because Chime is impossible on AISPL. Built and
   offline-tested; not yet deployed. Needs from AVC: media server source IPs, a Call Recording platform -> recorder IP:5060
   (dual stream, G.711, no SRTP), Call Recording on Webextest1, firewall. Then inspect `call.json`/`metadata1.xml` for

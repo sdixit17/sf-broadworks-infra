@@ -452,8 +452,9 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", choices=["up", "status", "logs", "setup-code", "restart", "stop", "start", "delete"])
-    ap.add_argument("--domain", default="test.bridge.telqon.com",
-                    help="this bridge's address(es), comma-separated; bridge.telqon.com itself is the front door")
+    ap.add_argument("--domain", default="bridge.telqon.com,test.bridge.telqon.com",
+                    help="this bridge's address(es), comma-separated, main first. bridge.telqon.com stays on this "
+                         "server until the front door (CloudFront) is live; then use test.bridge.telqon.com only")
     ap.add_argument("--front-door", default="https://bridge.telqon.com",
                     help="where Salesforce loads the phone (front-door/front_door.py); the bridge accepts it")
     ap.add_argument("--app-dir", default=str(INFRA.parent / "sf-broadworks-bridge"),
