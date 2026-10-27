@@ -3,7 +3,8 @@
 
     python voiceai/aws_voiceai.py up --allow <SBC IP> --registrar <SBC IP or name>[:port] --domain avcone.co.uk \\
         --sip-user <line/port user> [--auth-user <name>] --queue <call center number> --bridge-url https://...
-    python voiceai/aws_voiceai.py up --greeting greeting.wav      upload a new greeting (8 kHz mono 16-bit WAV)
+    python voiceai/aws_voiceai.py up --greeting greeting.wav      upload a greeting (8 kHz mono 16-bit WAV;
+                                                                  with the conversation on it plays before the AI's hello)
     python voiceai/aws_voiceai.py status                          server, IP, settings, registered or not
     python voiceai/aws_voiceai.py logs [--lines 200] [--since '30 min ago']
     python voiceai/aws_voiceai.py delete
@@ -11,6 +12,12 @@
 Secrets come from your shell, never the command line; `up` stores them encrypted in SSM (/<name>/...):
     export VOICEAI_SIP_PASSWORD='...'     # the Voice AI user's Authentication password (BroadWorks)
     export VOICEAI_BRIDGE_TOKEN='...'     # the bridge's Settings > Voice AI > Voice AI server token
+  Stage 2, the conversation (both keys needed; without them the server greets and hands off):
+    export ANTHROPIC_API_KEY='...'        # console.anthropic.com > API keys
+    export DEEPGRAM_API_KEY='...'         # Deepgram console > API keys (listening and the AI's voice)
+    python voiceai/aws_voiceai.py up [--model claude-haiku-5-5] [--effort low] [--voice aura-athena-en]
+        [--company AVC] [--allow-writes yes|no] [--knowledge info.txt | --knowledge none] [--greeting none]
+  `--no-ai` removes the two keys again (back to stage 1).
 
 What `up` creates in --region (default eu-west-2), named <name> (default telqon-voiceai):
     one EC2 server (t4g.small, Amazon Linux 2023) with a fixed public IP (Elastic IP)
@@ -39,8 +46,10 @@ import aws_recorder as rec  # noqa: E402
 from aws_recorder import ClientError, step  # noqa: E402
 
 SIP_PORT, RTP_LO, RTP_HI = 5060, 30000, 30999
-SETTINGS = ("registrar", "domain", "sip_user", "auth_user", "queue", "bridge_url", "user_agent")
-SECRETS = {"sip_password": "VOICEAI_SIP_PASSWORD", "bridge_token": "VOICEAI_BRIDGE_TOKEN"}
+SETTINGS = ("registrar", "domain", "sip_user", "auth_user", "queue", "bridge_url", "user_agent",
+            "model", "effort", "voice", "company", "allow_writes", "stt_model", "language")
+SECRETS = {"sip_password": "VOICEAI_SIP_PASSWORD", "bridge_token": "VOICEAI_BRIDGE_TOKEN",
+           "anthropic_api_key": "ANTHROPIC_API_KEY", "deepgram_api_key": "DEEPGRAM_API_KEY"}
 
 
 def cmd():
@@ -74,9 +83,11 @@ class VoiceAIServer(rec.RecorderServer):
         return f"s3://{self.bucket}/{key}"
 
     def greeting(self):
-        """--greeting: check it here, upload it next to the bundles -> its s3:// path (or '')."""
+        """--greeting: check it here, upload it next to the bundles -> its s3:// path, 'none' or '-'."""
         if not self.a.greeting:
-            return ""
+            return "-"
+        if self.a.greeting == "none":
+            return "none"
         p = Path(self.a.greeting).expanduser()
         if not p.is_file():
             raise SystemExit(f"{p} not found")
@@ -86,19 +97,49 @@ class VoiceAIServer(rec.RecorderServer):
         step("greeting uploaded")
         return f"s3://{self.bucket}/{key}"
 
+    def knowledge(self):
+        """--knowledge: a text file the assistant should know (opening hours, FAQs) -> its s3:// path, 'none' or '-'."""
+        k = self.a.knowledge
+        if not k:
+            return "-"
+        if k == "none":
+            return "none"
+        p = Path(k).expanduser()
+        if not p.is_file():
+            raise SystemExit(f"{p} not found")
+        text = p.read_text(encoding="utf-8", errors="replace")
+        if len(text) > 40000:
+            raise SystemExit(f"{p} is {len(text)} characters; keep it under 40,000 (the assistant reads all of it)")
+        key = f"knowledge/{datetime.now(timezone.utc):%Y%m%d-%H%M%S}.txt"
+        self.s3.upload_file(str(p), self.bucket, key)
+        step(f"knowledge uploaded ({len(text)} characters)")
+        return f"s3://{self.bucket}/{key}"
+
     def set_params(self):
         p = self.params_path()
+        if self.a.no_ai:
+            for name in ("anthropic_api_key", "deepgram_api_key"):
+                try:
+                    self.ssm.delete_parameter(Name=f"{p}/{name}")
+                except ClientError:
+                    pass
+            step("conversation turned off (Anthropic and Deepgram keys removed): greeting + hand-off only")
         for name in SETTINGS:
             value = (getattr(self.a, name, None) or "").strip()
             if name == "bridge_url":
                 value = value.rstrip("/")
                 if value and not value.startswith("https://"):
                     raise SystemExit("--bridge-url must start with https://")
+            if name == "allow_writes" and value:
+                value = "1" if value.lower() in ("1", "yes", "true", "on") else "0"
+            if name == "effort" and value and value not in ("low", "medium", "high"):
+                raise SystemExit("--effort: low, medium or high")
             if value:
                 self.ssm.put_parameter(Name=f"{p}/{name}", Value=value, Overwrite=True, Type="String")
                 step(f"{name}: {value}")
         for name, env in SECRETS.items():
-            value = os.environ.get(env, "").strip()
+            value = "" if self.a.no_ai and name in ("anthropic_api_key", "deepgram_api_key") else \
+                os.environ.get(env, "").strip()
             if value:
                 self.ssm.put_parameter(Name=f"{p}/{name}", Value=value, Overwrite=True, Type="SecureString")
                 step(f"{name} stored (encrypted, from ${env})")
@@ -130,6 +171,7 @@ class VoiceAIServer(rec.RecorderServer):
             opts = ["--" + m.replace("_", "-") for m in missing if m not in SECRETS]
             raise SystemExit("still missing: " + ", ".join(opts + [f"export {e}=..." for e in env]))
         greeting = self.greeting()
+        knowledge = self.knowledge()
         bundle = self.bundle()
         inst = self.instance()
         if inst is None:
@@ -152,7 +194,7 @@ class VoiceAIServer(rec.RecorderServer):
             "for i in $(seq 1 60); do command -v aws >/dev/null && break; sleep 5; done",
             f"aws s3 cp --region {self.a.region} --only-show-errors {bundle} /tmp/vd/b.tar.gz",
             "tar -xzf /tmp/vd/b.tar.gz -C /tmp/vd deploy/deploy.sh",
-            f"bash /tmp/vd/deploy/deploy.sh {bundle} {self.a.region} {ip} '{allow}' {self.params_path()}/ {greeting} "
+            f"bash /tmp/vd/deploy/deploy.sh {bundle} {self.a.region} {ip} '{allow}' {self.params_path()}/ {greeting} {knowledge} "
             "2>&1 | tail -30"])
         print()
         print(out.strip())
@@ -167,6 +209,11 @@ Voice AI {iid}   IP {ip}   region {self.a.region}
 Registers as {prm.get('sip_user', '?')}@{prm.get('domain', '?')} (auth {prm.get('auth_user') or prm.get('sip_user', '?')}) with {prm.get('registrar', '?')}
 Bridge {prm.get('bridge_url', '?')}   fallback queue {prm.get('queue') or '-'}
 Allowed sources (SBC): {allow or 'none yet'}
+Conversation: {"on, Claude " + (prm.get('model') or 'claude-haiku-5-5') + ", effort " + (prm.get('effort') or 'low')
+               + ", voice " + (prm.get('voice') or 'aura-athena-en') + ", may create cases: "
+               + ("no" if prm.get('allow_writes') == '0' else "yes")
+               if prm.get('anthropic_api_key') and prm.get('deepgram_api_key')
+               else "off (greeting + hand-off; export ANTHROPIC_API_KEY and DEEPGRAM_API_KEY, then up)"}
 
 For the SBC (access side, like a phone): accept REGISTER/INVITE from {ip}:{SIP_PORT} UDP, RTP UDP {RTP_LO}-{RTP_HI};
     User-Agent "Avaya-One-compatible Telqon-VoiceAI/..." (matches Avaya.*One.*); G.711 only, no SRTP.""")
@@ -227,6 +274,15 @@ def main():
     ap.add_argument("--user-agent", help=argparse.SUPPRESS)
     ap.add_argument("--greeting", help="up: WAV played on answer (8 kHz mono 16-bit; macOS: "
                                        "say -o greeting.wav --data-format=LEI16@8000 \"...\")")
+    ap.add_argument("--model", help="up: Claude model for the conversation (default claude-haiku-5-5)")
+    ap.add_argument("--effort", help="up: low | medium | high (default low: fastest replies)")
+    ap.add_argument("--voice", help="up: Deepgram Aura voice (default aura-athena-en, British female)")
+    ap.add_argument("--company", help="up: the name the assistant answers with (default AVC)")
+    ap.add_argument("--allow-writes", help="up: yes = may create cases and add comments, no = look up and hand over")
+    ap.add_argument("--stt-model", help=argparse.SUPPRESS)
+    ap.add_argument("--language", help=argparse.SUPPRESS)
+    ap.add_argument("--knowledge", help="up: text file with what the assistant should know; 'none' removes it")
+    ap.add_argument("--no-ai", action="store_true", help="up: remove the AI keys (back to greeting + hand-off)")
     ap.add_argument("--app-dir", default=str(INFRA.parent / "sf-broadworks-bridge"),
                     help="checkout of sdixit17/sf-broadworks-bridge (default: next to this repository)")
     ap.add_argument("--region", default="eu-west-2")
