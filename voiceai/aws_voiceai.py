@@ -47,7 +47,7 @@ from aws_recorder import ClientError, step  # noqa: E402
 
 SIP_PORT, RTP_LO, RTP_HI = 5060, 30000, 30999
 SETTINGS = ("registrar", "domain", "sip_user", "auth_user", "queue", "bridge_url", "user_agent",
-            "model", "effort", "voice", "company", "allow_writes", "stt_model", "language")
+            "model", "effort", "voice", "company", "allow_writes", "stt_model", "language", "voice_gain")
 SECRETS = {"sip_password": "VOICEAI_SIP_PASSWORD", "bridge_token": "VOICEAI_BRIDGE_TOKEN",
            "anthropic_api_key": "ANTHROPIC_API_KEY", "deepgram_api_key": "DEEPGRAM_API_KEY"}
 
@@ -278,6 +278,8 @@ def main():
     ap.add_argument("--effort", help="up: low | medium | high (default low: fastest replies)")
     ap.add_argument("--voice", help="up: Deepgram Aura voice (default aura-athena-en, British female)")
     ap.add_argument("--company", help="up: the name the assistant answers with (default AVC)")
+    ap.add_argument("--voice-gain", help="up: the AI's voice volume in dB, e.g. -6 if mobile callers hear crackle "
+                                         "(default 0)")
     ap.add_argument("--allow-writes", help="up: yes = may create cases and add comments, no = look up and hand over")
     ap.add_argument("--stt-model", help=argparse.SUPPRESS)
     ap.add_argument("--language", help=argparse.SUPPRESS)
