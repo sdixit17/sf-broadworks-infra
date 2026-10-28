@@ -5,3 +5,4 @@ __pycache__/
 *.key
 .terraform/
 *.tfstate*
+website/dist/

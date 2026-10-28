@@ -1,0 +1,38 @@
+<!-- title: ROI Calculator | What an AI Front Desk Saves | {{brand}}
+description: Estimate the agent hours and cost an AI receptionist saves each month, and how many after-hours calls it answers instead of voicemail. -->
+<section class="page-hero">
+  <div class="wrap center">
+    <span class="eyebrow">ROI calculator</span>
+    <h1>What would an AI front desk <span class="grad-text">save your customer?</span></h1>
+    <p class="lead">Move the sliders to match a typical customer. The figures update as you go.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="calc reveal" data-calc>
+      <div class="calc-in">
+        <div class="range"><div class="row"><label for="r-calls">Inbound calls per month</label><output for="r-calls"></output></div>
+          <input type="range" id="r-calls" name="calls" min="100" max="20000" step="100" value="2000"></div>
+        <div class="range"><div class="row"><label for="r-share">Calls the AI can finish alone</label><output for="r-share"></output></div>
+          <input type="range" id="r-share" name="share" min="5" max="80" step="1" value="35" data-suffix="%"></div>
+        <div class="range"><div class="row"><label for="r-handle">Agent minutes per call</label><output for="r-handle"></output></div>
+          <input type="range" id="r-handle" name="handle" min="2" max="20" step="1" value="6" data-suffix=" min"></div>
+        <div class="range"><div class="row"><label for="r-cost">Agent cost per hour</label><output for="r-cost"></output></div>
+          <input type="range" id="r-cost" name="cost" min="12" max="60" step="1" value="22" data-prefix="&pound;"></div>
+        <div class="range" style="margin-bottom:0"><div class="row"><label for="r-after">Calls outside office hours</label><output for="r-after"></output></div>
+          <input type="range" id="r-after" name="after" min="0" max="40" step="1" value="15" data-suffix="%"></div>
+      </div>
+      <div class="calc-out">
+        <div><div class="small" style="color:#a5b4fc;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Agent time saved per month</div>
+          <div class="big-num" data-out="saving">&pound;0</div></div>
+        <div class="out-row"><span>Agent hours freed</span><b data-out="hours">0</b></div>
+        <div class="out-row"><span>Calls finished by the AI</span><b data-out="ai">0</b></div>
+        <div class="out-row"><span>After-hours calls answered, not missed</span><b data-out="after">0</b></div>
+        <div class="out-row"><span>Saving per year</span><b data-out="year">&pound;0</b></div>
+        <p class="small" style="color:#94a3b8;margin:0">An estimate from your inputs: calls the AI finishes &times; minutes per call &times; agent cost. It doesn't include the AI service cost.</p>
+        <a class="btn btn-brand" href="contact.html" style="align-self:flex-start">Talk to us about these numbers</a>
+      </div>
+    </div>
+  </div>
+</section>

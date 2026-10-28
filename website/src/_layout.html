@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{title}}</title>
+  <meta name="description" content="{{description}}">
+  <meta property="og:title" content="{{title}}">
+  <meta property="og:description" content="{{description}}">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/site.css?v={{build}}">
+</head>
+<body>
+  <a href="#main" class="sr-skip">Skip to content</a>
+  <header class="site-header">
+    <div class="wrap nav">
+      <a class="logo" href="index.html" aria-label="{{brand}} home">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f46e5"/><stop offset=".5" stop-color="#7c3aed"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#lg)"/><g stroke="#fff" stroke-width="2.6" stroke-linecap="round"><path d="M9 13v6"/><path d="M13.5 10v12"/><path d="M18 8v16"/><path d="M22.5 12v8"/></g></svg>
+        <span>{{brand}}</span>
+      </a>
+      <nav class="nav-links" aria-label="Main">
+        <a href="ai-front-desk.html"{{active:ai-front-desk}}>AI Front Desk</a>
+        <a href="crm-calling.html"{{active:crm-calling}}>CRM Calling</a>
+        <a href="call-insight.html"{{active:call-insight}}>Call Insight</a>
+        <a href="partners.html"{{active:partners}}>Partners</a>
+        <a href="packages.html"{{active:packages}}>Packages</a>
+        <a href="roi.html"{{active:roi}}>ROI</a>
+      </nav>
+      <div class="nav-cta">
+        <a class="btn btn-ghost" data-demo-link href="contact.html#demo"><span class="pulse"></span>Call our AI</a>
+        <a class="btn btn-primary" href="partners.html#register">Become a partner</a>
+      </div>
+      <button class="menu-btn" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    </div>
+  </header>
+
+  <main id="main">
+{{content}}
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="foot-grid">
+        <div>
+          <a class="logo" href="index.html" aria-label="{{brand}} home">
+            <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#4f46e5"/><g stroke="#fff" stroke-width="2.6" stroke-linecap="round"><path d="M9 13v6"/><path d="M13.5 10v12"/><path d="M18 8v16"/><path d="M22.5 12v8"/></g></svg>
+            <span>{{brand}}</span>
+          </a>
+          <p class="muted small" style="margin-top:14px;max-width:320px">The channel-first AI and voice platform for MSPs, telecom providers and resellers. Your brand, our platform.</p>
+        </div>
+        <div>
+          <h4>Platform</h4>
+          <ul>
+            <li><a href="ai-front-desk.html">AI Front Desk</a></li>
+            <li><a href="crm-calling.html">CRM Calling</a></li>
+            <li><a href="call-insight.html">Call Insight</a></li>
+            <li><a href="packages.html">Packages</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Partners</h4>
+          <ul>
+            <li><a href="partners.html">Partner programme</a></li>
+            <li><a href="partners.html#register">Register as a partner</a></li>
+            <li><a href="roi.html">ROI calculator</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Talk to us</h4>
+          <ul>
+            <li><a data-demo-link href="contact.html#demo">Call our AI now</a></li>
+            <li><a href="contact.html">Book a demo</a></li>
+            <li><a href="contact.html#contact">Contact</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>&copy; <span data-year>2026</span> {{brand}}. All rights reserved.</span>
+        <span>Salesforce, HubSpot, Cisco BroadWorks and Webex are trademarks of their respective owners.</span>
+      </div>
+    </div>
+  </footer>
+
+  <a class="btn btn-brand call-fab" data-demo-link href="contact.html#demo"><span class="pulse"></span>Call our AI</a>
+
+  <script src="config.js?v={{build}}"></script>
+  <script src="assets/site.js?v={{build}}"></script>
+</body>
+</html>
