@@ -13,7 +13,7 @@ Site options for `up` (they end up in config.js; pages are unchanged):
     --contact-email       without HubSpot: forms open an email to this address
 
 What `up` creates in --region (default eu-west-2), named <name> (default telqon-website):
-    one EC2 server (t4g.nano, Amazon Linux 2023, ARM, IMDSv2, encrypted disk) running nginx
+    one EC2 server (t4g.micro, Amazon Linux 2023, ARM, IMDSv2, encrypted disk) running nginx
     a fixed public IP (Elastic IP): the site is http://<IP>/ until a domain is pointed at it
     a security group open on 80 and 443 only (no SSH: Session Manager)
     an IAM role for Session Manager and for reading site bundles; a private S3 bucket for the bundles
@@ -63,8 +63,12 @@ class WebsiteServer(base.Server):
         return f"s3://{self.bucket}/{key}"
 
     def user_data(self, bundle, setup_code):
-        # Only preparation: `up` deploys the site through Session Manager once the server is running.
-        return "#!/bin/bash\ndnf install -y -q nginx || true\n"
+        # Only preparation (swap first: dnf needs more memory than a small server has); `up` deploys the site through
+        # Session Manager once the server is running.
+        return ("#!/bin/bash\n"
+                "if [ ! -f /swapfile ]; then fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && "
+                "swapon /swapfile && echo '/swapfile swap swap defaults 0 0' >> /etc/fstab; fi\n"
+                "dnf install -y -q nginx || true\n")
 
     def up(self):
         step(f"account {self.account}, region {self.a.region}")
@@ -89,7 +93,7 @@ class WebsiteServer(base.Server):
             "for i in $(seq 1 60); do command -v aws >/dev/null && break; sleep 5; done",
             f"aws s3 cp --region {self.a.region} --only-show-errors {bundle} /tmp/wd/b.tar.gz",
             "tar -xzf /tmp/wd/b.tar.gz -C /tmp/wd deploy.sh",
-            f"bash /tmp/wd/deploy.sh {bundle} {self.a.region} 2>&1 | tail -15"])
+            f"bash /tmp/wd/deploy.sh {bundle} {self.a.region} 2>&1 | tail -15"], timeout=900)
         print()
         print(out.strip())
         if status != "Success":
@@ -133,7 +137,7 @@ def main():
     ap.add_argument("--contact-email", help="up: forms open an email to this address when HubSpot isn't set")
     ap.add_argument("--region", default="eu-west-2")
     ap.add_argument("--name", default="telqon-website")
-    ap.add_argument("--instance-type", default="t4g.nano")
+    ap.add_argument("--instance-type", default="t4g.micro")   # nano (0.5 GB) stalled installing nginx
     a = ap.parse_args()
     s = WebsiteServer(a)
     getattr(s, a.command)()

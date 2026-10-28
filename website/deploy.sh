@@ -6,6 +6,12 @@ BUNDLE="$1"; REGION="$2"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
+# first boot: let the user data (swap + nginx install) finish instead of running a second dnf next to it
+timeout 600 cloud-init status --wait >/dev/null 2>&1 || true
+if [ ! -f /swapfile ]; then
+  fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+  echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
+fi
 command -v nginx >/dev/null || dnf install -y -q nginx
 aws s3 cp --region "$REGION" --only-show-errors "$BUNDLE" "$WORK/site.tar.gz"
 tar -xzf "$WORK/site.tar.gz" -C "$WORK"
