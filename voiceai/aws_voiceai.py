@@ -15,7 +15,7 @@ Secrets come from your shell, never the command line; `up` stores them encrypted
   Stage 2, the conversation (both keys needed; without them the server greets and hands off):
     export ANTHROPIC_API_KEY='...'        # console.anthropic.com > API keys
     export DEEPGRAM_API_KEY='...'         # Deepgram console > API keys (listening and the AI's voice)
-    python voiceai/aws_voiceai.py up [--model claude-haiku-5-5] [--effort low] [--voice aura-2-athena-en]
+    python voiceai/aws_voiceai.py up [--model claude-haiku-5-5] [--effort low] [--voice aura-athena-en]
         [--company AVC] [--allow-writes yes|no] [--knowledge info.txt | --knowledge none] [--greeting none]
         [--callbacks yes|no] [--partner-knowledge partner.txt | none]   (website "Let our AI call you")
   `--no-ai` removes the two keys again (back to stage 1).
@@ -214,7 +214,7 @@ Registers as {prm.get('sip_user', '?')}@{prm.get('domain', '?')} (auth {prm.get(
 Bridge {prm.get('bridge_url', '?')}   fallback queue {prm.get('queue') or '-'}
 Allowed sources (SBC): {allow or 'none yet'}
 Conversation: {"on, Claude " + (prm.get('model') or 'claude-haiku-5-5') + ", effort " + (prm.get('effort') or 'low')
-               + ", voice " + (prm.get("voice") or "aura-2-athena-en") + ", may create cases: "
+               + ", voice " + (prm.get("voice") or "aura-athena-en") + ", may create cases: "
                + ("no" if prm.get('allow_writes') == '0' else "yes")
                if prm.get('anthropic_api_key') and prm.get('deepgram_api_key')
                else "off (greeting + hand-off; export ANTHROPIC_API_KEY and DEEPGRAM_API_KEY, then up)"}
@@ -280,7 +280,7 @@ def main():
                                        "say -o greeting.wav --data-format=LEI16@8000 \"...\")")
     ap.add_argument("--model", help="up: Claude model for the conversation (default claude-haiku-5-5)")
     ap.add_argument("--effort", help="up: low | medium | high (default low: fastest replies)")
-    ap.add_argument("--voice", help="up: Deepgram Aura voice (default aura-2-athena-en, British female; e.g. aura-2-draco-en British male)")
+    ap.add_argument("--voice", help="up: Deepgram Aura voice (default aura-athena-en, British female; Aura-2 voices e.g. aura-2-athena-en sound newer but reply 1-2 s slower)")
     ap.add_argument("--company", help="up: the name the assistant answers with (default AVC)")
     ap.add_argument("--voice-gain", help="up: the AI's voice volume in dB, e.g. -6 if mobile callers hear crackle "
                                          "(default 0)")
