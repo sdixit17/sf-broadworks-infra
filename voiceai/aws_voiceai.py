@@ -48,7 +48,7 @@ from aws_recorder import ClientError, step  # noqa: E402
 
 SIP_PORT, RTP_LO, RTP_HI = 5060, 30000, 30999
 SETTINGS = ("registrar", "domain", "sip_user", "auth_user", "queue", "bridge_url", "user_agent",
-            "model", "effort", "voice", "company", "allow_writes", "stt_model", "language", "voice_gain", "callbacks")
+            "model", "effort", "voice", "company", "allow_writes", "stt_model", "language", "voice_gain", "callbacks", "thinking")
 SECRETS = {"sip_password": "VOICEAI_SIP_PASSWORD", "bridge_token": "VOICEAI_BRIDGE_TOKEN",
            "anthropic_api_key": "ANTHROPIC_API_KEY", "deepgram_api_key": "DEEPGRAM_API_KEY"}
 
@@ -135,6 +135,8 @@ class VoiceAIServer(rec.RecorderServer):
                     raise SystemExit("--bridge-url must start with https://")
             if name in ("allow_writes", "callbacks") and value:
                 value = "1" if value.lower() in ("1", "yes", "true", "on") else "0"
+            if name == "thinking" and value and value not in ("off", "adaptive"):
+                raise SystemExit("--thinking: off or adaptive")
             if name == "effort" and value and value not in ("low", "medium", "high"):
                 raise SystemExit("--effort: low, medium or high")
             if value:
@@ -288,6 +290,7 @@ def main():
     ap.add_argument("--stt-model", help=argparse.SUPPRESS)
     ap.add_argument("--language", help=argparse.SUPPRESS)
     ap.add_argument("--knowledge", help="up: text file with what the assistant should know; 'none' removes it")
+    ap.add_argument("--thinking", help="up: off = fastest replies (default), adaptive = Claude may think first (slower)")
     ap.add_argument("--callbacks", help="up: yes = call back website visitors (\"Let our AI call you\"), no = off "
                                         "(default yes; the bridge's Settings > Website callbacks controls the form)")
     ap.add_argument("--partner-knowledge", help="up: text file about the partner programme for website callbacks "
