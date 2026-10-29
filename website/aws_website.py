@@ -11,6 +11,8 @@ Site options for `up` (they end up in config.js; pages are unchanged):
     --hubspot-portal, --hubspot-form-demo, --hubspot-form-partner
                           HubSpot portal ID and form GUIDs: forms then submit straight to HubSpot
     --contact-email       without HubSpot: forms open an email to this address
+    --callback-url        the bridge that takes "Let our AI call you" requests (e.g. https://bridge.telqon.com); on the
+                          bridge: Settings > Website callbacks, with this site's address (http://<IP>) as an origin
 
 What `up` creates in --region (default eu-west-2), named <name> (default telqon-website):
     one EC2 server (t4g.micro, Amazon Linux 2023, ARM, IMDSv2, encrypted disk) running nginx
@@ -26,6 +28,7 @@ import io
 import sys
 import tarfile
 import tempfile
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,6 +42,17 @@ from aws_test_server import step  # noqa: E402
 import build as site  # noqa: E402
 
 
+def nginx_conf(callback_url):
+    """nginx.conf with the bridge's origin allowed in the CSP (the callback form posts to it)."""
+    origin = ""
+    if callback_url:
+        u = urllib.parse.urlsplit(callback_url.strip())
+        if u.scheme not in ("https", "http") or not u.netloc:
+            raise SystemExit(f"--callback-url must look like https://bridge.example.com (got {callback_url})")
+        origin = f" {u.scheme}://{u.netloc}"
+    return (HERE / "nginx.conf").read_text(encoding="utf-8").replace("{{callback_origin}}", origin)
+
+
 def cmd():
     return f"python {sys.argv[0]}"
 
@@ -50,16 +64,19 @@ class WebsiteServer(base.Server):
             dist = Path(tmp) / "dist"
             pages = site.build(self.a.brand, self.a.demo_number or "", self.a.hubspot_portal or "",
                                {"demo": self.a.hubspot_form_demo, "partner": self.a.hubspot_form_partner},
-                               self.a.contact_email or "", dist=dist)
+                               self.a.contact_email or "", dist=dist, callback_url=self.a.callback_url or "")
+            conf = Path(tmp) / "nginx.conf"
+            conf.write_text(nginx_conf(self.a.callback_url), encoding="utf-8")
             buf = io.BytesIO()
             with tarfile.open(fileobj=buf, mode="w:gz") as t:
                 t.add(dist, arcname="dist")
-                t.add(HERE / "nginx.conf", arcname="nginx.conf")
+                t.add(conf, arcname="nginx.conf")
                 t.add(HERE / "deploy.sh", arcname="deploy.sh")
         key = f"bundles/{datetime.now(timezone.utc):%Y%m%d-%H%M%S}-site.tar.gz"
         self.s3.put_object(Bucket=self.bucket, Key=key, Body=buf.getvalue())
         step(f"site built ({len(pages)} pages, brand {self.a.brand}, demo number "
-             f"{self.a.demo_number or 'not set'}) and uploaded ({len(buf.getvalue()) // 1024} KB)")
+             f"{self.a.demo_number or 'not set'}, callbacks {self.a.callback_url or 'not set'}) and uploaded "
+             f"({len(buf.getvalue()) // 1024} KB)")
         return f"s3://{self.bucket}/{key}"
 
     def user_data(self, bundle, setup_code):
@@ -104,6 +121,8 @@ class WebsiteServer(base.Server):
         ok = self.http_check(ip)
         print(f"""
 Website: http://{ip}/   {ok}
+"Let our AI call you": {self.a.callback_url or 'not connected (--callback-url)'}; on the bridge, Settings > Website
+callbacks > Website address(es) must include http://{ip}
 Update after changing pages or options:  {cmd()} up [--demo-number ...]
 A domain later: point an A record at {ip}, then add HTTPS (ask Claude: certbot or Caddy on this server).""")
 
@@ -135,6 +154,7 @@ def main():
     ap.add_argument("--hubspot-form-demo", help="up: HubSpot form GUID for 'Book a demo'")
     ap.add_argument("--hubspot-form-partner", help="up: HubSpot form GUID for partner registration")
     ap.add_argument("--contact-email", help="up: forms open an email to this address when HubSpot isn't set")
+    ap.add_argument("--callback-url", help="up: the bridge for 'Let our AI call you', e.g. https://bridge.telqon.com")
     ap.add_argument("--region", default="eu-west-2")
     ap.add_argument("--name", default="telqon-website")
     ap.add_argument("--instance-type", default="t4g.micro")   # nano (0.5 GB) stalled installing nginx

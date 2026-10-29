@@ -1,5 +1,5 @@
 /* Telcom-Company website behaviour. Settings come from config.js (written at deploy time):
- *   window.SITE = { demoNumber, hubspotPortal, hubspotForms: { demo, partner, contact }, contactEmail }
+ *   window.SITE = { demoNumber, hubspotPortal, hubspotForms: { demo, partner, contact }, contactEmail, callbackUrl }
  */
 (function () {
   'use strict';
@@ -107,6 +107,59 @@
       } else {
         done(true, 'Thank you. (Preview site: this form is not connected to HubSpot yet.)');
       }
+    });
+  });
+
+  // ------------------------------------------------------------ "Let our AI call you" (the bridge queues it, the AI calls)
+  var STATUS = {
+    queued: function (p) { return p > 1 ? 'You are number ' + p + ' in line. Our AI will call you shortly.'
+                                         : 'Our AI will call you in a moment. Keep your phone handy.'; },
+    calling: function () { return 'Calling you now…'; },
+    in_call: function () { return 'You are talking with our AI. Enjoy the call!'; },
+    done: function () { return 'Thanks for talking with us. Our partner team will be in touch.'; },
+    missed: function () { return 'We could not reach you this time. Our partner team will be in touch.'; },
+    failed: function () { return 'Sorry, the call did not go through. Our partner team will be in touch.'; },
+    expired: function () { return 'Sorry, we could not call you in time. Our partner team will be in touch.'; }
+  };
+  $$('form[data-callback-form]').forEach(function (form) {
+    var msg = $('.form-msg', form);
+    var btn = $('button[type="submit"]', form);
+    var base = (S.callbackUrl || '').replace(/\/+$/, '');
+    var show = function (cls, text, live) {
+      msg.className = 'form-msg ' + cls + (live ? ' callback-live' : '');
+      msg.innerHTML = '';
+      if (live) { var dot = document.createElement('span'); dot.className = 'pulse'; msg.appendChild(dot); }
+      msg.appendChild(document.createTextNode(text));
+    };
+    var follow = function (id, started) {
+      fetch(base + '/api/callback/' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (st) {
+        var f = STATUS[st.status];
+        var live = st.status === 'queued' || st.status === 'calling' || st.status === 'in_call';
+        show(st.status === 'failed' || st.status === 'expired' ? 'err' : 'ok', f ? f(st.position) : 'Thank you.', live);
+        if (live && Date.now() - started < 30 * 60 * 1000) {
+          setTimeout(function () { follow(id, started); }, st.status === 'in_call' ? 5000 : 2500);
+        }
+      }).catch(function () { setTimeout(function () { follow(id, started); }, 5000); });
+    };
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      if (!form.reportValidity()) return;
+      if (!base) { show('ok', 'Thank you. (Preview site: callbacks are not connected yet.)'); return; }
+      var d = new FormData(form);
+      var body = { name: d.get('name'), phone: d.get('phone'), company: d.get('company') || '', email: d.get('email') || '',
+                   website: d.get('website') || '', consent: d.get('consent') === 'on' };
+      btn.disabled = true;
+      show('ok', 'Sending…');
+      fetch(base + '/api/callback', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify(body) })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (res) {
+          if (!res.ok) { btn.disabled = false; show('err', res.j.error || 'Sorry, that did not work. Please try again.'); return; }
+          form.reset();
+          follow(res.j.id, Date.now());
+          setTimeout(function () { btn.disabled = false; }, 60000);
+        })
+        .catch(function () { btn.disabled = false; show('err', 'Sorry, we could not reach our phone system. Please try again.'); });
     });
   });
 

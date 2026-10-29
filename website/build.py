@@ -3,7 +3,7 @@
 
     python website/build.py [--brand "Telcom-Company"] [--demo-number "+44 20 0000 0000"]
                             [--hubspot-portal 123456 --hubspot-form-demo <guid> --hubspot-form-partner <guid>]
-                            [--contact-email sales@example.com]
+                            [--contact-email sales@example.com] [--callback-url https://bridge.example.com]
 
 Pages live in src/pages/*.html: a first comment with `title:` and `description:`, then the page's sections. They are
 wrapped in src/_layout.html (header, footer). Tokens: {{brand}}, {{icon:name}}. Settings the browser needs (demo
@@ -81,7 +81,8 @@ def page(path, layout, brand, build):
     return out
 
 
-def build(brand="Telcom-Company", demo_number="", hubspot_portal="", hubspot_forms=None, contact_email="", dist=DIST):
+def build(brand="Telcom-Company", demo_number="", hubspot_portal="", hubspot_forms=None, contact_email="", dist=DIST,
+          callback_url=""):
     if dist.exists():
         shutil.rmtree(dist)
     shutil.copytree(SRC / "assets", dist / "assets")
@@ -91,7 +92,8 @@ def build(brand="Telcom-Company", demo_number="", hubspot_portal="", hubspot_for
     for p in pages:
         (dist / p.name).write_text(page(p, layout, brand, stamp), encoding="utf-8")
     cfg = {"brand": brand, "demoNumber": demo_number, "hubspotPortal": hubspot_portal,
-           "hubspotForms": {k: v for k, v in (hubspot_forms or {}).items() if v}, "contactEmail": contact_email}
+           "hubspotForms": {k: v for k, v in (hubspot_forms or {}).items() if v}, "contactEmail": contact_email,
+           "callbackUrl": callback_url.rstrip("/")}
     (dist / "config.js").write_text("window.SITE = " + json.dumps(cfg, indent=2) + ";\n", encoding="utf-8")
     (dist / "robots.txt").write_text("User-agent: *\nAllow: /\n", encoding="utf-8")
     return [p.name for p in pages]
@@ -105,9 +107,11 @@ def main():
     ap.add_argument("--hubspot-form-demo", default="")
     ap.add_argument("--hubspot-form-partner", default="")
     ap.add_argument("--contact-email", default="")
+    ap.add_argument("--callback-url", default="", help="the bridge that takes 'Let our AI call you' requests")
     a = ap.parse_args()
     names = build(a.brand, a.demo_number, a.hubspot_portal,
-                  {"demo": a.hubspot_form_demo, "partner": a.hubspot_form_partner}, a.contact_email)
+                  {"demo": a.hubspot_form_demo, "partner": a.hubspot_form_partner}, a.contact_email,
+                  callback_url=a.callback_url)
     print(f"built {len(names)} pages into {DIST}: {', '.join(names)}")
 
 

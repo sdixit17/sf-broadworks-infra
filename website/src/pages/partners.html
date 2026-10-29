@@ -5,7 +5,29 @@ description: Join the {{brand}} Partner Programme: white-label AI receptionist, 
     <span class="eyebrow">Partner Programme</span>
     <h1>Your brand. Our platform. <span class="grad-text">Recurring revenue.</span></h1>
     <p class="lead">Built for MSPs, telecom providers and UC resellers who want to sell AI voice services without building them.</p>
-    <div class="btn-row" style="margin-top:28px"><a class="btn btn-brand" href="#register">Register as a partner</a><a class="btn btn-ghost" data-demo-link href="contact.html#demo">Call our AI first</a></div>
+    <div class="btn-row" style="margin-top:28px"><a class="btn btn-brand" href="#callback"><span class="pulse"></span>Let our AI call you</a><a class="btn btn-ghost" href="#register">Register as a partner</a></div>
+  </div>
+</section>
+
+<section class="section" id="callback">
+  <div class="wrap split" style="align-items:start">
+    <div class="reveal">
+      <span class="eyebrow">Let our AI call you</span>
+      <h2>Hear the AI pitch our partner programme, live</h2>
+      <p class="lead">Leave your number and our AI assistant calls you within a minute or two. It explains the programme, answers your questions and passes your details to our partner team, so you experience exactly what your customers would get.</p>
+      <ul class="ticks"><li>A real call, in a natural voice</li><li>Ask anything about the programme</li><li>Say "a person, please" at any time</li></ul>
+    </div>
+    <form class="form-card reveal" data-callback-form novalidate>
+      <div class="form-grid">
+        <div class="full"><label for="cb-name">Your name</label><input id="cb-name" name="name" autocomplete="name" required maxlength="80"></div>
+        <div><label for="cb-phone">UK phone number</label><input id="cb-phone" name="phone" type="tel" autocomplete="tel" required placeholder="07700 900123"></div>
+        <div><label for="cb-company">Company</label><input id="cb-company" name="company" autocomplete="organization" maxlength="120"></div>
+        <div class="full"><label for="cb-email">Work email (optional)</label><input id="cb-email" name="email" type="email" autocomplete="email" maxlength="120"></div>
+        <div class="hp" aria-hidden="true"><label for="cb-website">Website</label><input id="cb-website" name="website" tabindex="-1" autocomplete="off"></div>
+        <div class="full"><label class="check"><input type="checkbox" name="consent" required> Call me now about the {{brand}} Partner Programme. I understand the call is made by an AI assistant and may be recorded.</label></div>
+        <div class="full"><button class="btn btn-brand" type="submit"><span class="pulse"></span>Call me now</button><div class="form-msg" role="status" aria-live="polite"></div></div>
+      </div>
+    </form>
   </div>
 </section>
 

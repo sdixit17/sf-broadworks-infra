@@ -17,6 +17,7 @@ Secrets come from your shell, never the command line; `up` stores them encrypted
     export DEEPGRAM_API_KEY='...'         # Deepgram console > API keys (listening and the AI's voice)
     python voiceai/aws_voiceai.py up [--model claude-haiku-5-5] [--effort low] [--voice aura-athena-en]
         [--company AVC] [--allow-writes yes|no] [--knowledge info.txt | --knowledge none] [--greeting none]
+        [--callbacks yes|no] [--partner-knowledge partner.txt | none]   (website "Let our AI call you")
   `--no-ai` removes the two keys again (back to stage 1).
 
 What `up` creates in --region (default eu-west-2), named <name> (default telqon-voiceai):
@@ -47,7 +48,7 @@ from aws_recorder import ClientError, step  # noqa: E402
 
 SIP_PORT, RTP_LO, RTP_HI = 5060, 30000, 30999
 SETTINGS = ("registrar", "domain", "sip_user", "auth_user", "queue", "bridge_url", "user_agent",
-            "model", "effort", "voice", "company", "allow_writes", "stt_model", "language", "voice_gain")
+            "model", "effort", "voice", "company", "allow_writes", "stt_model", "language", "voice_gain", "callbacks")
 SECRETS = {"sip_password": "VOICEAI_SIP_PASSWORD", "bridge_token": "VOICEAI_BRIDGE_TOKEN",
            "anthropic_api_key": "ANTHROPIC_API_KEY", "deepgram_api_key": "DEEPGRAM_API_KEY"}
 
@@ -65,7 +66,8 @@ class VoiceAIServer(rec.RecorderServer):
         app = Path(self.a.app_dir).expanduser().resolve()
         if not (app / "voiceai" / "sipua.py").is_file():
             raise SystemExit(f"{app} has no voiceai/ (sf-broadworks-bridge v0.21.0 or later); pass --app-dir")
-        files = [f for f in self.git(app, "ls-files", "voiceai", "recorder").split() if f.endswith(".py")]
+        files = [f for f in self.git(app, "ls-files", "voiceai", "recorder").split()
+                 if f.endswith(".py") or f.startswith("voiceai/playbooks/")]          # code + built-in playbooks
         dirty = self.git(app, "status", "--porcelain", "--untracked-files=no", "voiceai", "recorder").strip()
         rev = self.git(app, "rev-parse", "--short", "HEAD").strip()
         version = (app / "VERSION").read_text().strip() if (app / "VERSION").is_file() else "?"
@@ -97,9 +99,10 @@ class VoiceAIServer(rec.RecorderServer):
         step("greeting uploaded")
         return f"s3://{self.bucket}/{key}"
 
-    def knowledge(self):
-        """--knowledge: a text file the assistant should know (opening hours, FAQs) -> its s3:// path, 'none' or '-'."""
-        k = self.a.knowledge
+    def knowledge(self, k=None, what="knowledge"):
+        """--knowledge: a text file the assistant should know (opening hours, FAQs) -> its s3:// path, 'none' or '-'.
+        Also --partner-knowledge (what the AI tells website callbacks about the partner programme)."""
+        k = self.a.knowledge if k is None else k
         if not k:
             return "-"
         if k == "none":
@@ -110,9 +113,9 @@ class VoiceAIServer(rec.RecorderServer):
         text = p.read_text(encoding="utf-8", errors="replace")
         if len(text) > 40000:
             raise SystemExit(f"{p} is {len(text)} characters; keep it under 40,000 (the assistant reads all of it)")
-        key = f"knowledge/{datetime.now(timezone.utc):%Y%m%d-%H%M%S}.txt"
+        key = f"{what}/{datetime.now(timezone.utc):%Y%m%d-%H%M%S}.txt"
         self.s3.upload_file(str(p), self.bucket, key)
-        step(f"knowledge uploaded ({len(text)} characters)")
+        step(f"{what} uploaded ({len(text)} characters)")
         return f"s3://{self.bucket}/{key}"
 
     def set_params(self):
@@ -130,7 +133,7 @@ class VoiceAIServer(rec.RecorderServer):
                 value = value.rstrip("/")
                 if value and not value.startswith("https://"):
                     raise SystemExit("--bridge-url must start with https://")
-            if name == "allow_writes" and value:
+            if name in ("allow_writes", "callbacks") and value:
                 value = "1" if value.lower() in ("1", "yes", "true", "on") else "0"
             if name == "effort" and value and value not in ("low", "medium", "high"):
                 raise SystemExit("--effort: low, medium or high")
@@ -172,6 +175,7 @@ class VoiceAIServer(rec.RecorderServer):
             raise SystemExit("still missing: " + ", ".join(opts + [f"export {e}=..." for e in env]))
         greeting = self.greeting()
         knowledge = self.knowledge()
+        partner = self.knowledge(self.a.partner_knowledge or "", "partner-knowledge")
         bundle = self.bundle()
         inst = self.instance()
         if inst is None:
@@ -194,7 +198,7 @@ class VoiceAIServer(rec.RecorderServer):
             "for i in $(seq 1 60); do command -v aws >/dev/null && break; sleep 5; done",
             f"aws s3 cp --region {self.a.region} --only-show-errors {bundle} /tmp/vd/b.tar.gz",
             "tar -xzf /tmp/vd/b.tar.gz -C /tmp/vd deploy/deploy.sh",
-            f"bash /tmp/vd/deploy/deploy.sh {bundle} {self.a.region} {ip} '{allow}' {self.params_path()}/ {greeting} {knowledge} "
+            f"bash /tmp/vd/deploy/deploy.sh {bundle} {self.a.region} {ip} '{allow}' {self.params_path()}/ {greeting} {knowledge} {partner} "
             "2>&1 | tail -30"])
         print()
         print(out.strip())
@@ -284,6 +288,11 @@ def main():
     ap.add_argument("--stt-model", help=argparse.SUPPRESS)
     ap.add_argument("--language", help=argparse.SUPPRESS)
     ap.add_argument("--knowledge", help="up: text file with what the assistant should know; 'none' removes it")
+    ap.add_argument("--callbacks", help="up: yes = call back website visitors (\"Let our AI call you\"), no = off "
+                                        "(default yes; the bridge's Settings > Website callbacks controls the form)")
+    ap.add_argument("--partner-knowledge", help="up: text file about the partner programme for website callbacks "
+                                                "(default: the app's voiceai/playbooks/partner-programme.txt); 'none' "
+                                                "goes back to the default")
     ap.add_argument("--no-ai", action="store_true", help="up: remove the AI keys (back to greeting + hand-off)")
     ap.add_argument("--app-dir", default=str(INFRA.parent / "sf-broadworks-bridge"),
                     help="checkout of sdixit17/sf-broadworks-bridge (default: next to this repository)")
