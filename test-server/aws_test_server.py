@@ -289,14 +289,17 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
 
     def recordings_access(self, iid):
         """The bridge signs playback links for call recordings in the recorder's bucket (S3 presigned GET), so its
-        role may read recordings/*, and the container must reach the instance role (IMDSv2 hop limit 2)."""
+        role may read recordings/*, and screen recordings' upload/playback links (screen/*), and the container must reach the instance role (IMDSv2 hop limit 2)."""
         bucket = self.a.recordings_bucket or f"telqon-recorder-recordings-{self.account}"
         self.iam.put_role_policy(RoleName=self.role, PolicyName="recordings-read", PolicyDocument=(
             '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject",'
-            f'"Resource":"arn:aws:s3:::{bucket}/recordings/*"}}]}}'))
+            f'"Resource":"arn:aws:s3:::{bucket}/recordings/*"}},'
+            # screen recordings (app v0.34.0): the bridge signs the browser extension's upload (PUT) and playback
+            '{"Effect":"Allow","Action":["s3:PutObject","s3:GetObject"],'
+            f'"Resource":"arn:aws:s3:::{bucket}/screen/*"}}]}}'))
         self.ec2.modify_instance_metadata_options(InstanceId=iid, HttpTokens="required", HttpEndpoint="enabled",
                                                   HttpPutResponseHopLimit=2)
-        step(f"bridge may read recordings in s3://{bucket}/recordings/ (for playback links)")
+        step(f"bridge may read recordings in s3://{bucket}/recordings/ and sign screen recordings in screen/")
 
     def report(self, iid, ip, setup_code=None):
         print(f"\nServer {iid}   IP {ip}   region {self.a.region}")

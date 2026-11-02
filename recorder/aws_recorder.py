@@ -120,6 +120,8 @@ class RecorderServer(base.Server):
             step(f"recordings bucket {self.rec_bucket} created (private, encrypted)")
         self.s3.put_bucket_lifecycle_configuration(Bucket=self.rec_bucket, LifecycleConfiguration={"Rules": [{
             "ID": "recordings-expire", "Status": "Enabled", "Filter": {"Prefix": "recordings/"},
+            "Expiration": {"Days": self.a.keep_days}}, {
+            "ID": "screen-expire", "Status": "Enabled", "Filter": {"Prefix": "screen/"},     # agents' screen videos
             "Expiration": {"Days": self.a.keep_days}}]})
 
     def params_path(self):
