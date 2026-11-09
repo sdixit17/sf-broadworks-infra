@@ -58,8 +58,6 @@ def domains(value):
 
 
 class Server:
-    VOLUME_GB = 20                                            # subclasses that need more disk raise it
-
     def __init__(self, a):
         self.a = a
         self.s = boto3.session.Session(region_name=a.region)
@@ -205,7 +203,7 @@ bash /tmp/first/deploy/server-deploy.sh {bundle} {self.a.region} > /var/log/brid
                     IamInstanceProfile={"Name": self.role}, UserData=self.user_data(bundle, setup_code),
                     MetadataOptions={"HttpTokens": "required", "HttpEndpoint": "enabled",
                                      "HttpPutResponseHopLimit": 2},    # 2: the bridge container reaches the role
-                    BlockDeviceMappings=[{"DeviceName": "/dev/xvda", "Ebs": {"VolumeSize": self.VOLUME_GB, "VolumeType": "gp3",
+                    BlockDeviceMappings=[{"DeviceName": "/dev/xvda", "Ebs": {"VolumeSize": 20, "VolumeType": "gp3",
                                                                              "Encrypted": True}}],
                     TagSpecifications=[{"ResourceType": "instance", "Tags": self.tag()},
                                        {"ResourceType": "volume", "Tags": self.tag()}])["Instances"][0]
