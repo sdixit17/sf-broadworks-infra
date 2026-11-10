@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{title}}</title>
+<meta name="description" content="{{description}}">
+<link rel="canonical" href="{{canonical}}">
+<meta property="og:title" content="{{title}}">
+<meta property="og:description" content="{{description}}">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0d2a3a">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/site.css?v={{build}}">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap bar">
+    <a class="logo" href="index.html" aria-label="Telqon home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" class="logo-bg"/><path d="M8 11h16M16 11v12" class="logo-t"/><circle cx="23" cy="21" r="2.2" class="logo-dot"/></svg>
+      <span>Telqon</span>
+    </a>
+    <button class="menu-btn" type="button" aria-expanded="false" aria-controls="nav"><span></span><span></span><span class="sr">Menu</span></button>
+    <nav id="nav" class="nav" aria-label="Main">
+      <a href="platforms.html"{{active:platforms}}>Platforms</a>
+      <a href="contact-centre.html"{{active:contact-centre}}>Contact centre</a>
+      <a href="development.html"{{active:development}}>Development</a>
+      <a href="services.html"{{active:services}}>Professional services</a>
+      <a href="insights.html"{{active:insights}}>Insights</a>
+      <a href="about.html"{{active:about}}>About</a>
+      <a class="btn btn-small" href="contact.html"{{active:contact}}>Talk to an engineer</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+{{content}}
+</main>
+
+<footer class="site-footer">
+  <div class="wrap foot">
+    <div class="foot-brand">
+      <a class="logo" href="index.html"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" class="logo-bg"/><path d="M8 11h16M16 11v12" class="logo-t"/><circle cx="23" cy="21" r="2.2" class="logo-dot"/></svg><span>Telqon</span></a>
+      <p>Voice platforms run, extended and integrated, so service providers can compete with the cloud giants.</p>
+    </div>
+    <div>
+      <h2>Services</h2>
+      <a href="platforms.html">UCaaS platforms</a>
+      <a href="contact-centre.html">Contact centre (CCaaS)</a>
+      <a href="development.html">Integration and development</a>
+      <a href="services.html">Professional services</a>
+    </div>
+    <div>
+      <h2>Company</h2>
+      <a href="about.html">About</a>
+      <a href="insights.html">Insights</a>
+      <a href="contact.html">Contact</a>
+    </div>
+    <div>
+      <h2>Get in touch</h2>
+      <p class="contact-line">{{icon:mail}}<span>info@telqon.com</span></p>
+      <p class="contact-line">{{icon:pin}}<span>India · serving providers in the UK, Europe and Asia</span></p>
+    </div>
+  </div>
+  <div class="wrap legal">
+    <span>© {{year}} Telqon. Product names are trademarks of their owners.</span>
+    <span><a href="privacy.html">Privacy</a><a href="accessibility.html">Accessibility</a></span>
+  </div>
+</footer>
+<script src="config.js?v={{build}}"></script>
+<script src="assets/site.js?v={{build}}"></script>
+</body>
+</html>

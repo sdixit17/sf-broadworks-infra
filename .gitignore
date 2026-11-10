@@ -6,3 +6,4 @@ __pycache__/
 .terraform/
 *.tfstate*
 website/dist/
+telqon-site/dist/
